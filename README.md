@@ -2,6 +2,12 @@
 
 Local-first deployable demo for the DUAL Conditional Trade Instruments concept.
 
+Production demo:
+
+```text
+https://conditional-trade-instruments.vercel.app
+```
+
 Open:
 
 ```text

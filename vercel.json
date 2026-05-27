@@ -2,7 +2,7 @@
   "cleanUrls": true,
   "functions": {
     "server.mjs": {
-      "includeFiles": "{index.html,app.js,styles.css,concept.png,dual-conditional-trade-template.json,api/**}"
+      "includeFiles": "{index.html,client.js,styles.css,concept.png,dual-conditional-trade-template.json,api/**}"
     }
   },
   "headers": [
