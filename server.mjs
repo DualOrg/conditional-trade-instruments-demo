@@ -37,6 +37,13 @@ const mcpServerInfo = {
   version: appVersion
 };
 
+const viewInputSchema = {
+  type: "string",
+  enum: ["compact", "full"],
+  default: "compact",
+  description: "compact returns decision-critical fields without repeated policy/instrument blocks; full returns the complete diagnostic envelope."
+};
+
 const evidenceRefInputSchema = {
   type: "object",
   additionalProperties: false,
@@ -105,16 +112,24 @@ const mcpTools = [
     type: "object",
     additionalProperties: false,
     properties: {
-      include_instrument: { type: "boolean", default: true },
-      compact: { type: "boolean", default: false }
+      include_instrument: { type: "boolean", default: false },
+      compact: { type: "boolean", default: false },
+      view: viewInputSchema
     }
   }, { annotations: { readOnlyHint: true }, "x-dual": { requiresAuthentication: false, publicWrites: false } }),
   mcpTool("tradeflow_dual_get_instrument", "Read the current conditional trade instrument from DUAL when configured, otherwise return the deterministic seed object.", {
     type: "object",
     additionalProperties: false,
-    properties: {}
+    properties: {
+      view: { ...viewInputSchema, default: "full" }
+    }
   }, { annotations: { readOnlyHint: true }, "x-dual": { requiresAuthentication: false, publicWrites: false } }),
   mcpTool("tradeflow_dual_get_policy", "Read the discoverable mandate policy: supported corridors, commodity classes, payment rails, ceilings, evidence contract, result convention, and operator-gate boundary.", {
+    type: "object",
+    additionalProperties: false,
+    properties: {}
+  }, { annotations: { readOnlyHint: true }, "x-dual": { requiresAuthentication: false, publicWrites: false } }),
+  mcpTool("tradeflow_dual_get_policy_history", "Read the immutable policy version registry used to verify older proofs against the policy version they were issued under.", {
     type: "object",
     additionalProperties: false,
     properties: {}
@@ -124,31 +139,38 @@ const mcpTools = [
     additionalProperties: false,
     properties: {
       instrument: instrumentInputSchema,
-      gate: gateInputSchema
+      gate: gateInputSchema,
+      view: viewInputSchema
     }
   }, { annotations: { readOnlyHint: true }, "x-dual": { requiresAuthentication: false, publicWrites: false } }),
   mcpTool("tradeflow_dual_get_proof", "Read a portable proof bundle for the current trade instrument, including policy, instrument, event, settlement, and state hashes.", {
     type: "object",
     additionalProperties: false,
-    properties: {}
+    properties: {
+      view: { ...viewInputSchema, default: "full" }
+    }
   }, { annotations: { readOnlyHint: true }, "x-dual": { requiresAuthentication: false, publicWrites: false } }),
   mcpTool("tradeflow_dual_verify_proof", "Verify the current proof bundle and return checks, caveats, and hash consistency.", {
     type: "object",
     additionalProperties: false,
-    properties: {}
+    properties: {
+      view: viewInputSchema
+    }
   }, { annotations: { readOnlyHint: true }, "x-dual": { requiresAuthentication: false, publicWrites: false } }),
   mcpTool("tradeflow_dual_prepare_sync_payload", "Build the DUAL update payload for an operator-gated sync. This public MCP tool returns a preview only and does not execute writes.", {
     type: "object",
     additionalProperties: false,
     properties: {
-      instrument: instrumentInputSchema
+      instrument: instrumentInputSchema,
+      view: viewInputSchema
     }
   }, { annotations: { readOnlyHint: true }, "x-dual": { requiresWriteReadinessForExecution: true, previewOnly: true, publicWrites: false } }),
   mcpTool("tradeflow_dual_prepare_mint_payload", "Build the DUAL mint payload for the conditional trade instrument template. This public MCP tool returns a preview only and does not execute writes.", {
     type: "object",
     additionalProperties: false,
     properties: {
-      instrument: instrumentInputSchema
+      instrument: instrumentInputSchema,
+      view: viewInputSchema
     }
   }, { annotations: { readOnlyHint: true }, "x-dual": { requiresWriteReadinessForExecution: true, previewOnly: true, publicWrites: false } }),
   mcpTool("tradeflow_dual_get_mint_status", "Read the mint/readback status for the conditional trade instrument. This never lists private wallets or executes mint writes.", {
@@ -161,23 +183,28 @@ const mcpTools = [
     additionalProperties: false,
     properties: {
       instrument: instrumentInputSchema,
-      gates: { type: "array", items: gateInputSchema }
+      gates: { type: "array", items: gateInputSchema },
+      halt_on_block: { type: "boolean", default: true },
+      view: viewInputSchema
     }
   }, { annotations: { readOnlyHint: true }, "x-dual": { requiresAuthentication: false, publicWrites: false, persisted: false } }),
   mcpTool("tradeflow_dual_evaluate_adversarial_gate", "Evaluate an arbitrary adversarial gate and compare the verifier result to an expected result.", {
     type: "object",
     additionalProperties: false,
+    required: ["expect", "gate"],
     properties: {
       instrument: instrumentInputSchema,
       gate: gateInputSchema,
-      expect: { type: "string", enum: ["Approved", "Approved with review", "Needs evidence", "Blocked", "blocked_or_escalated"], default: "Blocked" }
+      expect: { type: "string", enum: ["Approved", "Approved with review", "Needs evidence", "Blocked", "blocked_or_escalated"], description: "blocked_or_escalated matches any non-Approved result: Blocked, Needs evidence, or Approved with review." },
+      view: viewInputSchema
     }
   }, { annotations: { readOnlyHint: true }, "x-dual": { requiresAuthentication: false, publicWrites: false } }),
   mcpTool("tradeflow_dual_red_team", "Run a deterministic unsafe milestone scenario and prove the verifier blocks or escalates it before release. Tool ok=true means the MCP call succeeded; blockedOrEscalated=true means the verifier did its job.", {
     type: "object",
     additionalProperties: false,
     properties: {
-      scenario: { type: "string", enum: ["corridor_mismatch", "missing_evidence", "over_limit", "customs_missing"], default: "corridor_mismatch" }
+      scenario: { type: "string", enum: ["corridor_mismatch", "missing_evidence", "over_limit", "customs_missing"], default: "corridor_mismatch" },
+      view: viewInputSchema
     }
   }, { annotations: { readOnlyHint: true }, "x-dual": { requiresAuthentication: false, publicWrites: false, proactiveUse: "Call before approving unusual corridor, value, customs, or evidence requests." } })
 ];
@@ -186,6 +213,7 @@ const mcpResources = [
   mcpResource("tradeflow://status", "TradeFlow DUAL status", "DUAL readiness, public-write boundary, and current demo state."),
   mcpResource("tradeflow://instrument", "TradeFlow instrument", "Current conditional trade instrument properties."),
   mcpResource("tradeflow://policy", "TradeFlow policy", "Supported corridors, commodity classes, mandate ceilings, evidence contract, and operator-gate boundary."),
+  mcpResource("tradeflow://policy-history", "TradeFlow policy history", "Immutable policy version registry for old proof verification."),
   mcpResource("tradeflow://proof", "TradeFlow proof", "Portable proof bundle and verification caveats."),
   mcpResource("tradeflow://mint-status", "TradeFlow mint status", "Mint/readback readiness and current object handle, without executing writes."),
   mcpResource("tradeflow://template", "TradeFlow DUAL template", "Template name, properties, and actions for live setup."),
@@ -404,28 +432,43 @@ async function handleMcpMethod(request, method, params) {
 async function callMcpTool(_request, name, args) {
   switch (name) {
     case "tradeflow_dual_get_status":
+      validateTopLevelArgs(args, ["include_instrument", "compact", "view"], name);
       return buildMcpStatus(args);
     case "tradeflow_dual_get_instrument":
-      return { ok: true, instrument: instrumentEnvelope(await currentInstrumentSnapshot()) };
+      validateTopLevelArgs(args, ["view"], name);
+      return { ok: true, instrument: instrumentEnvelope(await currentInstrumentSnapshot(), { view: viewMode(args, "full") }) };
     case "tradeflow_dual_get_policy":
+      validateTopLevelArgs(args, [], name);
       return { ok: true, policy: policyMetadata(), publicWrites: false };
+    case "tradeflow_dual_get_policy_history":
+      validateTopLevelArgs(args, [], name);
+      return { ok: true, policy_history: policyHistory(), publicWrites: false };
     case "tradeflow_dual_evaluate_gate":
+      validateTopLevelArgs(args, ["instrument", "gate", "view"], name);
       return evaluateGateForMcp(args);
     case "tradeflow_dual_get_proof":
-      return { ok: true, proof: await buildProofBundle() };
+      validateTopLevelArgs(args, ["view"], name);
+      return { ok: true, proof: await buildProofBundle(null, { view: viewMode(args, "full") }) };
     case "tradeflow_dual_verify_proof":
-      return { ok: true, verification: await verifyProofBundle() };
+      validateTopLevelArgs(args, ["view"], name);
+      return { ok: true, verification: await verifyProofBundle({ view: viewMode(args) }) };
     case "tradeflow_dual_prepare_sync_payload":
+      validateTopLevelArgs(args, ["instrument", "view"], name);
       return prepareSyncPayload(args);
     case "tradeflow_dual_prepare_mint_payload":
+      validateTopLevelArgs(args, ["instrument", "view"], name);
       return prepareMintPayload(args);
     case "tradeflow_dual_get_mint_status":
+      validateTopLevelArgs(args, [], name);
       return getMintStatus();
     case "tradeflow_dual_simulate_lifecycle":
+      validateTopLevelArgs(args, ["instrument", "gates", "halt_on_block", "view"], name);
       return simulateLifecycle(args);
     case "tradeflow_dual_evaluate_adversarial_gate":
+      validateTopLevelArgs(args, ["instrument", "gate", "expect", "view"], name);
       return evaluateAdversarialGate(args);
     case "tradeflow_dual_red_team":
+      validateTopLevelArgs(args, ["scenario", "view"], name);
       return redTeamScenario(args);
     default:
       throw Object.assign(new Error(`Unknown TradeFlow MCP tool: ${name}`), { code: "mcp_tool_not_found", status: 404 });
@@ -436,6 +479,7 @@ async function readMcpResource(_request, uri) {
   if (uri === "tradeflow://status") return buildMcpStatus({ include_instrument: true });
   if (uri === "tradeflow://instrument") return { ok: true, instrument: instrumentEnvelope(await currentInstrumentSnapshot()) };
   if (uri === "tradeflow://policy") return { ok: true, policy: policyMetadata(), publicWrites: false };
+  if (uri === "tradeflow://policy-history") return { ok: true, policy_history: policyHistory(), publicWrites: false };
   if (uri === "tradeflow://proof") return { ok: true, proof: await buildProofBundle(), verification: await verifyProofBundle() };
   if (uri === "tradeflow://mint-status") return getMintStatus();
   if (uri === "tradeflow://template") return templateSummary();
@@ -485,7 +529,7 @@ function getMcpPrompt(name, args) {
 
 async function buildMcpStatus(args = {}) {
   const snapshot = await currentInstrumentSnapshot();
-  const compact = Boolean(args.compact);
+  const view = viewMode(args, "compact");
   const status = {
     ok: true,
     app: mcpServerInfo.name,
@@ -497,9 +541,11 @@ async function buildMcpStatus(args = {}) {
     writeExecutionExposed: false,
     warnings: mcpWarnings(snapshot.status)
   };
-  if (!compact && args.include_instrument !== false) {
-    status.instrument = instrumentEnvelope(snapshot);
-    status.proof = await buildProofBundle(snapshot);
+  if (view === "full" && args.include_instrument !== false) {
+    status.instrument = instrumentEnvelope(snapshot, { view: "full" });
+    status.proof = await buildProofBundle(snapshot, { view: "full" });
+  } else if (args.include_instrument === true) {
+    status.instrument = instrumentEnvelope(snapshot, { view: "compact" });
   }
   return status;
 }
@@ -536,30 +582,46 @@ async function currentInstrumentSnapshot() {
   };
 }
 
-function instrumentEnvelope(snapshot) {
+function instrumentEnvelope(snapshot, options = {}) {
   const properties = normalizeInstrumentProperties(snapshot.properties);
-  const hashes = deriveProofHashes(properties);
-  return {
+  const view = viewMode(options, "full");
+  const hashes = deriveProofHashes(properties, {
+    gate: options.eventGate || null,
+    evidence_refs: options.evidenceRefs !== undefined ? options.evidenceRefs : properties.evidence_refs
+  });
+  const declared = declaredHashes(properties);
+  const envelope = {
     source: snapshot.source,
     available: Boolean(snapshot.available),
     object: objectEnvelope(snapshot),
     properties,
-    semantics: {
-      current_milestone: "Next milestone awaiting verification, not the last verified milestone.",
-      verified_milestones: "Count of completed milestone gates before the current gate.",
-      stateless_public_mcp: "Read/evaluate tools do not persist lifecycle state. Use tradeflow_dual_simulate_lifecycle to thread a sequence in one response."
-    },
-    policy: policyMetadata(),
     evidence: {
       count: properties.evidence_refs.length,
       refs: properties.evidence_refs,
       hash: properties.evidence_hash || hashes.evidence_hash
     },
     hashes: {
-      declared: declaredHashes(properties),
-      derived: hashes
+      declared,
+      derived: hashes,
+      verification: hashVerification(declared, hashes)
     },
     caveats: proofCaveats(snapshot.status)
+  };
+  if (view === "compact") {
+    return {
+      ...envelope,
+      policy_uri: "tradeflow://policy",
+      semantics_uri: "tradeflow://policy"
+    };
+  }
+  return {
+    ...envelope,
+    semantics: {
+      current_milestone: "Next milestone awaiting verification, not the last verified milestone.",
+      verified_milestones: "Count of completed milestone gates before the current gate.",
+      stateless_public_mcp: "Read/evaluate tools do not persist lifecycle state. Use tradeflow_dual_simulate_lifecycle to thread a sequence in one response."
+    },
+    policy: policyMetadata()
   };
 }
 
@@ -579,6 +641,7 @@ async function snapshotFromArgs(args = {}) {
   if (args.instrument === undefined) return currentInstrumentSnapshot();
   validatePlainObject(args.instrument, "instrument");
   validateAllowedFields(args.instrument, new Set(Object.keys(instrumentTemplateProperties())), "invalid_instrument_fields", "instrument");
+  validateEvidenceRefList(args.instrument.evidence_refs, "instrument.evidence_refs");
   const properties = normalizeInstrumentProperties(args.instrument);
   return {
     source: "request",
@@ -593,6 +656,7 @@ function gateFromArgs(args = {}) {
   const rawGate = args.gate || args.request || pickAllowedFields(args, gateFieldNames());
   validatePlainObject(rawGate, "gate");
   validateAllowedFields(rawGate, new Set(gateFieldNames()), "invalid_gate_fields", "gate");
+  validateEvidenceRefList(rawGate.evidence_refs, "gate.evidence_refs");
   return normalizeGateRequest(rawGate);
 }
 
@@ -607,6 +671,7 @@ function gatesFromArgs(args = {}) {
   return args.gates.map((gate) => {
     validatePlainObject(gate, "gate");
     validateAllowedFields(gate, new Set(gateFieldNames()), "invalid_gate_fields", "gate");
+    validateEvidenceRefList(gate.evidence_refs, "gate.evidence_refs");
     return normalizeGateRequest(gate);
   });
 }
@@ -651,6 +716,36 @@ function validateAllowedFields(value, allowed, code, label) {
   });
 }
 
+function validateTopLevelArgs(args = {}, allowedKeys = [], label = "tool") {
+  validatePlainObject(args, "arguments");
+  validateAllowedFields(args, new Set(allowedKeys), "invalid_arguments", label);
+}
+
+function validateEvidenceRefList(refs, label) {
+  if (refs === undefined) return;
+  if (!Array.isArray(refs)) {
+    throw Object.assign(new Error(`${label} must be an array.`), {
+      status: 400,
+      code: "invalid_evidence_refs"
+    });
+  }
+  const allowed = new Set(["type", "id", "hash", "issuer", "uri"]);
+  refs.forEach((ref, index) => {
+    validatePlainObject(ref, `${label}[${index}]`);
+    validateAllowedFields(ref, allowed, "invalid_evidence_ref_fields", `${label}[${index}]`);
+  });
+}
+
+function viewMode(args = {}, fallback = "compact") {
+  if (args.compact === true) return "compact";
+  const view = args.view || fallback;
+  if (view === "compact" || view === "full") return view;
+  throw Object.assign(new Error(`view must be "compact" or "full", got "${view}".`), {
+    status: 400,
+    code: "invalid_view"
+  });
+}
+
 function declaredHashes(properties) {
   return {
     policy_hash: properties.policy_hash || "",
@@ -658,6 +753,73 @@ function declaredHashes(properties) {
     evidence_hash: properties.evidence_hash || "",
     last_event_hash: properties.last_event_hash || "",
     settlement_hash: properties.settlement_hash || ""
+  };
+}
+
+function hashVerification(declared, derived) {
+  return {
+    policy_hash: hashCheck(declared.policy_hash, derived.policy_hash, "policy_hash"),
+    instrument_hash: hashCheck(declared.instrument_hash, derived.instrument_hash, "instrument_hash"),
+    evidence_hash: hashCheck(declared.evidence_hash, derived.evidence_hash, "evidence_hash"),
+    last_event_hash: hashCheck(declared.last_event_hash, derived.event_hash, "event_hash"),
+    settlement_hash: hashCheck(declared.settlement_hash, derived.settlement_hash, "settlement_hash")
+  };
+}
+
+function hashCheck(declared, derived, derivedName) {
+  const declaredValue = declared || "";
+  return {
+    declared: declaredValue || null,
+    derived,
+    derivedName,
+    verifies: declaredValue ? declaredValue === derived : null,
+    note: declaredValue
+      ? declaredValue === derived
+        ? "Declared hash matches the value re-derived for this response context."
+        : "Declared hash does not match the value re-derived for this response context."
+      : "No declared hash was supplied; verifier used the re-derived value."
+  };
+}
+
+function compactEvaluation(evaluation) {
+  return {
+    allowed: evaluation.allowed,
+    result: evaluation.result,
+    code: evaluation.code,
+    reason: evaluation.reason,
+    source: evaluation.source,
+    gate: evaluation.gate,
+    proof: {
+      policy_hash: evaluation.proof.policy_hash,
+      instrument_hash: evaluation.proof.instrument_hash,
+      evidence_hash: evaluation.proof.evidence_hash,
+      event_hash: evaluation.proof.event_hash,
+      settlement_hash: evaluation.proof.settlement_hash,
+      decision_hash: evaluation.proof.decision_hash,
+      decision_content_hash: evaluation.proof.decision_content_hash,
+      decision_envelope_hash: evaluation.proof.decision_envelope_hash,
+      decision_hash_semantics: evaluation.proof.decision_hash_semantics,
+      evidence_refs: evaluation.proof.evidence_refs,
+      evidence_anchor: evaluation.proof.evidence_anchor,
+      evaluated_at: evaluation.proof.evaluated_at
+    }
+  };
+}
+
+function compactProof(proof) {
+  return {
+    id: proof.id,
+    source: proof.source,
+    generated_at: proof.generated_at,
+    object: proof.object,
+    instrument_id: proof.instrument.properties.instrument_id,
+    state: proof.instrument.properties.state,
+    current_milestone: proof.instrument.properties.current_milestone,
+    hashes: proof.hashes,
+    hash_verification: proof.instrument.hashes.verification,
+    bundle_hash: proof.bundle_hash,
+    caveats: proof.caveats,
+    full_resource: "tradeflow://proof"
   };
 }
 
@@ -729,28 +891,35 @@ function defaultLifecycleGates() {
 async function evaluateGateForMcp(args = {}) {
   const snapshot = await snapshotFromArgs(args);
   const gate = gateFromArgs(args);
+  const view = viewMode(args);
   const evaluation = evaluateInstrumentGate(snapshot.properties, gate, {
     source: snapshot.source,
     object: snapshot.object
   });
-  return {
+  const response = {
     ok: true,
     evaluated: true,
     publicWrites: false,
     writeExecutionExposed: false,
     resultConvention: "ok=true means the MCP call succeeded. Use evaluation.result and evaluation.allowed for the release decision.",
     status: snapshot.status,
-    instrument: instrumentEnvelope(snapshot),
-    policy: policyMetadata(),
-    evaluation
+    evaluation: view === "full" ? evaluation : compactEvaluation(evaluation)
   };
+  if (view === "full") {
+    response.instrument = instrumentEnvelope(snapshot, { view: "full" });
+    response.policy = policyMetadata();
+  } else {
+    response.policy_uri = "tradeflow://policy";
+  }
+  return response;
 }
 
-async function buildProofBundle(snapshotInput = null) {
+async function buildProofBundle(snapshotInput = null, options = {}) {
   const snapshot = snapshotInput || await currentInstrumentSnapshot();
   const properties = normalizeInstrumentProperties(snapshot.properties);
   const hashes = deriveProofHashes(properties);
   const declared = declaredHashes(properties);
+  const view = viewMode(options, "full");
   const bundle = {
     id: `tradeflow-proof-${properties.instrument_id}`,
     source: snapshot.source,
@@ -765,13 +934,13 @@ async function buildProofBundle(snapshotInput = null) {
       writable: snapshot.status.writable,
       public_writes: false
     },
-    instrument: instrumentEnvelope(snapshot),
+    instrument: instrumentEnvelope(snapshot, { view }),
     hashes,
     declared_hashes: declared,
     derived_hashes: hashes,
     caveats: proofCaveats(snapshot.status)
   };
-  return {
+  const proof = {
     ...bundle,
     bundle_hash: hashJson({
       template: bundle.template,
@@ -782,10 +951,12 @@ async function buildProofBundle(snapshotInput = null) {
       caveats: bundle.caveats
     })
   };
+  return view === "compact" ? compactProof(proof) : proof;
 }
 
-async function verifyProofBundle() {
-  const proof = await buildProofBundle();
+async function verifyProofBundle(options = {}) {
+  const view = viewMode(options);
+  const proof = await buildProofBundle(null, { view: "full" });
   const properties = proof.instrument.properties;
   const rederived = deriveProofHashes(properties);
   const declared = declaredHashes(properties);
@@ -855,8 +1026,13 @@ async function verifyProofBundle() {
     writable: proof.object.writable,
     publicWrites: proof.object.public_writes,
     hashes: proof.hashes,
-    declaredHashes: declared,
-    rederivedHashes: rederived,
+    declaredHashes: view === "full" ? declared : undefined,
+    rederivedHashes: view === "full" ? rederived : undefined,
+    hashVerification: hashVerification(declared, rederived),
+    verificationLevel: proof.source === "dual_readback" ? "dual_readback_rederived" : "deterministic_seed_rederived",
+    limitation: proof.source === "dual_readback"
+      ? "Hashes are re-derived from the configured DUAL object readback."
+      : "DUAL readback is not configured, so hashes are re-derived from the deterministic seed instrument.",
     checks,
     caveats: proof.caveats
   };
@@ -865,6 +1041,7 @@ async function verifyProofBundle() {
 async function prepareSyncPayload(args = {}) {
   const snapshot = await snapshotFromArgs(args);
   const properties = normalizeInstrumentProperties(snapshot.properties);
+  const view = viewMode(args);
   const config = dualConfig();
   const payload = updatePayload(config.objectId || "<DUAL_CONDITIONAL_TRADE_OBJECT_ID>", properties, {
     event_hash: properties.last_event_hash || properties.settlement_hash
@@ -877,7 +1054,7 @@ async function prepareSyncPayload(args = {}) {
     operatorGate: operatorGateSummary(),
     reason: "Public MCP returns an update payload preview only. Operator-gated sync means the REST endpoint requires DEMO_OPERATOR_TOKEN plus live-write env and explicit approval before DUAL event-bus execution.",
     readiness: readiness(),
-    instrument: instrumentEnvelope(snapshot),
+    instrument: instrumentEnvelope(snapshot, { view }),
     payload_preview: payload
   };
 }
@@ -885,6 +1062,7 @@ async function prepareSyncPayload(args = {}) {
 async function prepareMintPayload(args = {}) {
   const snapshot = await snapshotFromArgs(args);
   const properties = normalizeInstrumentProperties(snapshot.properties);
+  const view = viewMode(args);
   const config = dualConfig();
   const payload = mintPayload(config.templateId || "<DUAL_CONDITIONAL_TRADE_TEMPLATE_ID>", properties);
   return {
@@ -895,7 +1073,7 @@ async function prepareMintPayload(args = {}) {
     operatorGate: operatorGateSummary(),
     reason: "Public MCP returns a mint payload preview only. Operator-gated mint means the REST endpoint requires DEMO_OPERATOR_TOKEN plus live-write env and explicit approval before DUAL event-bus execution.",
     readiness: readiness(),
-    instrument: instrumentEnvelope(snapshot),
+    instrument: instrumentEnvelope(snapshot, { view }),
     payload_preview: payload
   };
 }
@@ -921,15 +1099,20 @@ async function getMintStatus() {
 async function simulateLifecycle(args = {}) {
   const snapshot = await snapshotFromArgs(args);
   const gates = gatesFromArgs(args);
+  const view = viewMode(args);
+  const haltOnBlock = args.halt_on_block !== false;
   let state = normalizeInstrumentProperties({
     ...snapshot.properties,
     released_usd: Number(snapshot.properties.released_usd || 0),
     remaining_usd: Number(snapshot.properties.remaining_usd || snapshot.properties.value_usd)
   });
   const steps = [];
+  let halted = false;
+  let lastGate = null;
 
   for (let index = 0; index < gates.length; index += 1) {
     const gate = normalizeGateRequest(gates[index]);
+    lastGate = gate;
     const evaluation = evaluateInstrumentGate(state, gate, {
       source: `simulate:${snapshot.source}`,
       object: snapshot.object
@@ -937,9 +1120,10 @@ async function simulateLifecycle(args = {}) {
     const nextGate = gates[index + 1] ? normalizeGateRequest(gates[index + 1]) : null;
     if (evaluation.allowed) {
       const released = Math.min(state.value_usd, state.released_usd + gate.release_usd);
+      const settled = !nextGate && released >= state.value_usd;
       state = normalizeInstrumentProperties({
         ...state,
-        state: nextGate ? "Milestone verified" : "Payment releasing",
+        state: settled ? "Settled" : nextGate ? "Milestone verified" : "Payment releasing",
         verified_milestones: state.verified_milestones + 1,
         released_usd: released,
         remaining_usd: Math.max(0, state.value_usd - released),
@@ -958,6 +1142,7 @@ async function simulateLifecycle(args = {}) {
         evidence_refs: mergeEvidenceRefs(state.evidence_refs, gate.evidence_refs),
         updated_at: state.updated_at
       });
+      halted = haltOnBlock;
     }
     const hashes = deriveProofHashes(state, { gate, evidence_refs: state.evidence_refs });
     state = normalizeInstrumentProperties({
@@ -972,8 +1157,10 @@ async function simulateLifecycle(args = {}) {
     steps.push({
       step: index + 1,
       gate,
-      evaluation,
+      evaluation: view === "full" ? evaluation : compactEvaluation(evaluation),
+      halted_after_step: halted,
       state: {
+        status: state.state,
         released_usd: state.released_usd,
         remaining_usd: state.remaining_usd,
         verified_milestones: state.verified_milestones,
@@ -981,28 +1168,46 @@ async function simulateLifecycle(args = {}) {
         blocked_actions: state.blocked_actions
       }
     });
+    if (halted) break;
   }
+  const finalHashes = deriveProofHashes(state, { gate: lastGate, evidence_refs: state.evidence_refs });
 
   return {
     ok: true,
     simulated: true,
+    halted,
+    halt_on_block: haltOnBlock,
     persisted: false,
     publicWrites: false,
     stateModel: "This helper threads state only inside the response. The public MCP does not persist lifecycle state; callers must carry returned state if they want to continue later.",
-    initial: instrumentEnvelope(snapshot),
+    policy_uri: "tradeflow://policy",
+    initial: instrumentEnvelope(snapshot, { view }),
     steps,
     final_instrument: instrumentEnvelope({
       ...snapshot,
       source: `simulation:${snapshot.source}`,
       properties: state
-    }),
-    final_hashes: deriveProofHashes(state)
+    }, { view, eventGate: lastGate, evidenceRefs: state.evidence_refs }),
+    final_hashes: finalHashes,
+    final_hash_verification: hashVerification(declaredHashes(state), finalHashes)
   };
 }
 
 async function evaluateAdversarialGate(args = {}) {
+  if (!args.expect) {
+    throw Object.assign(new Error("expect is required for adversarial gate assertions."), {
+      status: 400,
+      code: "argument_required"
+    });
+  }
+  if (!args.gate) {
+    throw Object.assign(new Error("gate is required for adversarial gate assertions."), {
+      status: 400,
+      code: "argument_required"
+    });
+  }
   const evaluationResult = await evaluateGateForMcp(args);
-  const expected = args.expect || "Blocked";
+  const expected = args.expect;
   const actual = evaluationResult.evaluation.result;
   const matchedExpectation = expected === "blocked_or_escalated"
     ? actual !== "Approved"
@@ -1013,6 +1218,7 @@ async function evaluateAdversarialGate(args = {}) {
     expected,
     actual,
     matchedExpectation,
+    expectSemantics: "blocked_or_escalated matches Blocked, Needs evidence, and Approved with review.",
     evaluation: evaluationResult.evaluation,
     instrument: evaluationResult.instrument,
     resultConvention: evaluationResult.resultConvention
@@ -1022,6 +1228,7 @@ async function evaluateAdversarialGate(args = {}) {
 async function redTeamScenario(args = {}) {
   const snapshot = await currentInstrumentSnapshot();
   const scenario = args.scenario || "corridor_mismatch";
+  const view = viewMode(args);
   const instrument = {
     ...snapshot.properties,
     ...(scenario === "over_limit" ? { value_usd: snapshot.properties.max_instrument_usd + 5000 } : {}),
@@ -1046,7 +1253,7 @@ async function redTeamScenario(args = {}) {
     blockedOrEscalated: evaluation.result !== "Approved",
     publicWrites: false,
     resultConvention: "ok=true means the red-team tool executed. blockedOrEscalated=true means the verifier blocked or escalated the unsafe scenario.",
-    evaluation
+    evaluation: view === "full" ? evaluation : compactEvaluation(evaluation)
   };
 }
 
@@ -1078,12 +1285,28 @@ function policyMetadata() {
       acceptedUriSchemes: ["ipfs://", "ar://", "https://", "demo://"]
     },
     stateModel: "Public MCP read/evaluate calls are stateless. Use tradeflow_dual_simulate_lifecycle for a response-local sequence, or thread returned state on the caller side.",
+    policyHistory: policyHistory(),
     operatorGate: operatorGateSummary(),
     orgExposure: {
       org_id: status.orgId,
       decision: "Included as a public demo routing handle; it is not an API secret."
     }
   };
+}
+
+function policyHistory() {
+  return [
+    {
+      version: 1,
+      status: "active",
+      effective_from: "2026-05-27",
+      supported_corridors: ["SG-AU"],
+      supported_commodity_classes: ["medical-devices"],
+      max_instrument_usd: 180000,
+      review_threshold_usd: 120000,
+      verification_note: "Existing proofs must be checked against the policy version carried in their instrument/proof payload, not whichever policy is current later."
+    }
+  ];
 }
 
 function operatorGateSummary() {

@@ -134,6 +134,7 @@ const mcpToolNames = mcpTools.tools.map((tool) => tool.name);
 assert(mcpToolNames.includes("tradeflow_dual_get_status"), "MCP tools include status read");
 assert(mcpToolNames.includes("tradeflow_dual_get_instrument"), "MCP tools include instrument read");
 assert(mcpToolNames.includes("tradeflow_dual_get_policy"), "MCP tools include policy discovery");
+assert(mcpToolNames.includes("tradeflow_dual_get_policy_history"), "MCP tools include policy history");
 assert(mcpToolNames.includes("tradeflow_dual_evaluate_gate"), "MCP tools include gate evaluator");
 assert(mcpToolNames.includes("tradeflow_dual_verify_proof"), "MCP tools include proof verifier");
 assert(mcpToolNames.includes("tradeflow_dual_get_mint_status"), "MCP tools include mint status read");
@@ -164,6 +165,13 @@ const mcpPolicy = mcpJson(await mcp("tools/call", {
 assert(mcpPolicy.policy.supported.corridors.includes("SG-AU"), "MCP policy lists supported corridor");
 assert(mcpPolicy.policy.supported.commodity_classes.includes("medical-devices"), "MCP policy lists supported commodity class");
 assert(mcpPolicy.policy.operatorGate.publicMcp.includes("previews only"), "MCP policy defines operator gate boundary");
+assert(mcpPolicy.policy.policyHistory[0].version === 1, "MCP policy includes policy history");
+
+const mcpPolicyHistory = mcpJson(await mcp("tools/call", {
+  name: "tradeflow_dual_get_policy_history",
+  arguments: {}
+}));
+assert(mcpPolicyHistory.policy_history[0].status === "active", "MCP policy history lists active version");
 
 const mcpApproved = mcpJson(await mcp("tools/call", {
   name: "tradeflow_dual_evaluate_gate",
@@ -182,7 +190,45 @@ assert(mcpApproved.evaluation.result === "Approved", "MCP evaluator approves in-
 assert(mcpApproved.evaluation.proof.decision_hash, "MCP evaluator returns decision hash");
 assert(mcpApproved.evaluation.proof.event_hash, "MCP evaluator returns event hash");
 assert(Array.isArray(mcpApproved.evaluation.proof.evidence_refs), "MCP evaluator returns evidence refs");
+assert(mcpApproved.evaluation.proof.evidence_anchor.source === "instrument", "MCP evaluator declares instrument-level evidence fallback");
 assert(mcpApproved.publicWrites === false, "MCP evaluator reports no public writes");
+
+const mcpApprovedAgain = mcpJson(await mcp("tools/call", {
+  name: "tradeflow_dual_evaluate_gate",
+  arguments: {
+    gate: {
+      milestone_id: "loaded",
+      milestone_name: "Cargo loaded",
+      corridor: "SG-AU",
+      commodity_class: "medical-devices",
+      release_usd: 29700,
+      evidence_attached: true
+    }
+  }
+}));
+assert(mcpApprovedAgain.evaluation.proof.decision_content_hash === mcpApproved.evaluation.proof.decision_content_hash, "MCP evaluator returns stable decision content hash");
+assert(mcpApprovedAgain.evaluation.proof.decision_envelope_hash, "MCP evaluator returns timestamped decision envelope hash");
+
+const mcpInvalidTopLevel = await mcp("tools/call", {
+  name: "tradeflow_dual_evaluate_gate",
+  arguments: { made_up_field: "reject-me" }
+});
+assert(mcpInvalidTopLevel.isError === true, "MCP evaluator rejects unknown top-level fields");
+assert(mcpJson(mcpInvalidTopLevel).error.code === "invalid_arguments", "MCP evaluator reports invalid arguments code");
+
+const mcpInvalidEvidenceRef = await mcp("tools/call", {
+  name: "tradeflow_dual_evaluate_gate",
+  arguments: {
+    gate: {
+      milestone_id: "loaded",
+      corridor: "SG-AU",
+      commodity_class: "medical-devices",
+      evidence_refs: [{ id: "DOC-1", unsupported: "reject-me" }]
+    }
+  }
+});
+assert(mcpInvalidEvidenceRef.isError === true, "MCP evaluator rejects unknown evidence ref fields");
+assert(mcpJson(mcpInvalidEvidenceRef).error.code === "invalid_evidence_ref_fields", "MCP evaluator reports invalid evidence ref field code");
 
 const mcpProof = mcpJson(await mcp("tools/call", {
   name: "tradeflow_dual_get_proof",
@@ -246,6 +292,25 @@ const mcpSimulation = mcpJson(await mcp("tools/call", {
 assert(mcpSimulation.persisted === false, "MCP lifecycle simulation does not persist state");
 assert(mcpSimulation.steps.length === 4, "MCP lifecycle simulation runs default four milestones");
 assert(mcpSimulation.final_instrument.properties.released_usd === 148500, "MCP lifecycle simulation releases full seed value");
+assert(mcpSimulation.final_instrument.properties.state === "Settled", "MCP lifecycle simulation ends in settled state");
+assert(mcpSimulation.steps[3].evaluation.result === "Approved with review", "MCP lifecycle simulation preserves cumulative human-review escalation");
+assert(mcpSimulation.final_hash_verification.last_event_hash.verifies === true, "MCP lifecycle final event hash verifies against last gate context");
+
+const mcpBlockedSimulation = mcpJson(await mcp("tools/call", {
+  name: "tradeflow_dual_simulate_lifecycle",
+  arguments: {
+    gates: [{
+      milestone_id: "loaded",
+      milestone_name: "Cargo loaded",
+      corridor: "NZ-AU",
+      commodity_class: "medical-devices",
+      release_usd: 29700,
+      evidence_attached: true
+    }]
+  }
+}));
+assert(mcpBlockedSimulation.halted === true, "MCP lifecycle simulation halts on blocked gate by default");
+assert(mcpBlockedSimulation.final_instrument.properties.blocked_actions === 1, "MCP lifecycle simulation increments blocked actions");
 
 const mcpAdversarial = mcpJson(await mcp("tools/call", {
   name: "tradeflow_dual_evaluate_adversarial_gate",
@@ -262,6 +327,22 @@ const mcpAdversarial = mcpJson(await mcp("tools/call", {
   }
 }));
 assert(mcpAdversarial.matchedExpectation === true, "MCP adversarial evaluator matches expected block");
+assert(mcpAdversarial.expectSemantics.includes("Approved with review"), "MCP adversarial evaluator documents blocked_or_escalated semantics");
+
+const mcpAdversarialMissingExpect = await mcp("tools/call", {
+  name: "tradeflow_dual_evaluate_adversarial_gate",
+  arguments: {
+    gate: {
+      milestone_id: "loaded",
+      corridor: "NZ-AU",
+      commodity_class: "medical-devices",
+      release_usd: 29700,
+      evidence_attached: true
+    }
+  }
+});
+assert(mcpAdversarialMissingExpect.isError === true, "MCP adversarial evaluator requires explicit expectation");
+assert(mcpJson(mcpAdversarialMissingExpect).error.code === "argument_required", "MCP adversarial evaluator reports missing expectation");
 
 const mcpRedTeam = mcpJson(await mcp("tools/call", {
   name: "tradeflow_dual_red_team",
@@ -273,6 +354,7 @@ assert(mcpRedTeam.evaluation.result === "Blocked", "MCP red-team returns blocked
 const mcpResources = await mcp("resources/list", {});
 assert(mcpResources.resources.some((resource) => resource.uri === "tradeflow://proof"), "MCP resources include proof");
 assert(mcpResources.resources.some((resource) => resource.uri === "tradeflow://policy"), "MCP resources include policy");
+assert(mcpResources.resources.some((resource) => resource.uri === "tradeflow://policy-history"), "MCP resources include policy history");
 assert(mcpResources.resources.some((resource) => resource.uri === "tradeflow://mint-status"), "MCP resources include mint status");
 assert(mcpResources.resources.some((resource) => resource.uri === "tradeflow://template"), "MCP resources include template");
 

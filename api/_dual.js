@@ -337,11 +337,34 @@ export function deriveProofHashes(properties, options = {}) {
 export function evaluateInstrumentGate(properties, request, context = {}) {
   const instrument = normalizeInstrumentProperties(properties);
   const gate = normalizeGateRequest(request);
-  const derivedHashes = deriveProofHashes(instrument, { gate, evidence_refs: gate.evidence_refs.length ? gate.evidence_refs : instrument.evidence_refs });
+  const evidenceAnchor = gate.evidence_refs.length
+    ? {
+        source: "gate",
+        detail: "Gate-level evidence_refs anchored this decision.",
+        refs: gate.evidence_refs
+      }
+    : instrument.evidence_refs.length
+      ? {
+          source: "instrument",
+          detail: "No gate-level evidence_refs were supplied; instrument-level evidence_refs anchored this decision.",
+          refs: instrument.evidence_refs
+        }
+      : gate.evidence_attached
+        ? {
+            source: "boolean_fallback",
+            detail: "No evidence_refs were supplied; demo boolean evidence_attached anchored this decision.",
+            refs: []
+          }
+        : {
+            source: "missing",
+            detail: "No evidence_refs or evidence_attached flag anchored this decision.",
+            refs: []
+          };
+  const derivedHashes = deriveProofHashes(instrument, { gate, evidence_refs: evidenceAnchor.refs });
   const proofHashes = {
     policy_hash: instrument.policy_hash || derivedHashes.policy_hash,
     instrument_hash: instrument.instrument_hash || derivedHashes.instrument_hash,
-    evidence_hash: gate.evidence_refs.length ? derivedHashes.evidence_hash : (instrument.evidence_hash || derivedHashes.evidence_hash),
+    evidence_hash: evidenceAnchor.refs.length ? derivedHashes.evidence_hash : (instrument.evidence_hash || derivedHashes.evidence_hash),
     event_hash: derivedHashes.event_hash,
     settlement_hash: instrument.settlement_hash || derivedHashes.settlement_hash
   };
@@ -392,6 +415,12 @@ export function evaluateInstrumentGate(properties, request, context = {}) {
     allowed = false;
     reasons.push(`${gate.milestone_name} requires an evidence packet before verification.`);
   }
+  if (allowed && evidenceAnchor.source === "instrument") {
+    reasons.push("No gate-level evidence_refs supplied; verified against instrument-level evidence refs.");
+  }
+  if (allowed && evidenceAnchor.source === "boolean_fallback") {
+    reasons.push("No evidence_refs supplied; accepted demo boolean evidence_attached fallback.");
+  }
 
   const cumulative = instrument.released_usd + gate.release_usd;
   if (allowed && cumulative > instrument.review_threshold_usd) {
@@ -401,7 +430,7 @@ export function evaluateInstrumentGate(properties, request, context = {}) {
   }
   if (!reasons.length) reasons.push("Corridor, commodity, evidence, value, sanctions, and customs checks passed.");
 
-  const decisionHash = hashJson({
+  const decisionContent = {
     instrument_id: instrument.instrument_id,
     gate,
     result,
@@ -411,7 +440,10 @@ export function evaluateInstrumentGate(properties, request, context = {}) {
     evidence_hash: proofHashes.evidence_hash,
     event_hash: proofHashes.event_hash,
     settlement_hash: proofHashes.settlement_hash
-  });
+  };
+  const evaluatedAt = new Date().toISOString();
+  const decisionContentHash = hashJson(decisionContent);
+  const decisionEnvelopeHash = hashJson({ ...decisionContent, evaluated_at: evaluatedAt });
 
   return {
     allowed,
@@ -438,10 +470,19 @@ export function evaluateInstrumentGate(properties, request, context = {}) {
       evidence_hash: proofHashes.evidence_hash,
       event_hash: proofHashes.event_hash,
       settlement_hash: proofHashes.settlement_hash,
-      decision_hash: decisionHash,
-      evidence_refs: gate.evidence_refs.length ? gate.evidence_refs : instrument.evidence_refs,
+      decision_hash: decisionContentHash,
+      decision_content_hash: decisionContentHash,
+      decision_envelope_hash: decisionEnvelopeHash,
+      decision_hash_semantics: "decision_hash is stable and aliases decision_content_hash. decision_envelope_hash includes evaluated_at for fresh attestations.",
+      evidence_refs: evidenceAnchor.refs,
+      evidence_anchor: {
+        source: evidenceAnchor.source,
+        detail: evidenceAnchor.detail,
+        ref_count: evidenceAnchor.refs.length,
+        hash: proofHashes.evidence_hash
+      },
       derived_hashes: derivedHashes,
-      evaluated_at: new Date().toISOString()
+      evaluated_at: evaluatedAt
     }
   };
 }

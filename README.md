@@ -86,6 +86,7 @@ Available MCP tools:
 - `tradeflow_dual_get_status`
 - `tradeflow_dual_get_instrument`
 - `tradeflow_dual_get_policy`
+- `tradeflow_dual_get_policy_history`
 - `tradeflow_dual_evaluate_gate`
 - `tradeflow_dual_get_proof`
 - `tradeflow_dual_verify_proof`
@@ -101,6 +102,7 @@ Available MCP resources:
 - `tradeflow://status`
 - `tradeflow://instrument`
 - `tradeflow://policy`
+- `tradeflow://policy-history`
 - `tradeflow://proof`
 - `tradeflow://mint-status`
 - `tradeflow://template`
@@ -110,7 +112,15 @@ The sync and mint tools are preview-only on the public MCP surface. They return 
 
 Tool `ok: true` means the MCP call succeeded. The trade decision lives in `evaluation.result`, `evaluation.allowed`, or `blockedOrEscalated` for red-team tools.
 
-The public MCP is stateless for read/evaluate calls. Use `tradeflow_dual_simulate_lifecycle` when an agent needs a response-local milestone sequence, or carry the returned instrument state on the caller side. Prefer `evidence_refs` with document hashes, CIDs, or signed attestation ids over the boolean `evidence_attached` shortcut.
+Most decision tools accept `view: "compact" | "full"`. Compact is the default for noisy evaluator and lifecycle responses; use full when debugging the complete policy/instrument envelope.
+
+The public MCP is stateless for read/evaluate calls. Use `tradeflow_dual_simulate_lifecycle` when an agent needs a response-local milestone sequence, or carry the returned instrument state on the caller side. The simulator halts on blocked gates by default and increments `blocked_actions`; pass `halt_on_block: false` to continue a sequence after a block.
+
+Prefer `evidence_refs` with document hashes, CIDs, or signed attestation ids over the boolean `evidence_attached` shortcut. If a gate omits refs but the instrument has refs, the verifier declares that the decision was anchored to instrument-level evidence.
+
+`decision_hash` is stable and aliases `decision_content_hash`; `decision_envelope_hash` includes `evaluated_at` for fresh attestations. Instrument hash comparisons include per-hash `verifies` fields so callers do not need to infer correctness by string-comparing declared and derived hashes.
+
+`tradeflow_dual_evaluate_adversarial_gate` requires an explicit `expect`. The special expectation `blocked_or_escalated` matches `Blocked`, `Needs evidence`, and `Approved with review`.
 
 For browser-based MCP hosts that send an `Origin` header from another host, set `DEMO_MCP_ALLOWED_ORIGINS` to the comma-separated allowed origins.
 
