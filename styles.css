@@ -434,6 +434,12 @@ button:focus-visible {
   text-transform: none;
 }
 
+.agent-btn.active {
+  background: var(--surface-strong);
+  border-color: rgba(32, 148, 162, 0.45);
+  color: var(--cyan-dark);
+}
+
 .danger-btn {
   background: #fff5f4;
   border-color: rgba(182, 59, 53, 0.35);
@@ -453,6 +459,11 @@ button:focus-visible {
 
 .full-width {
   width: 100%;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .button-grid {
@@ -1179,6 +1190,108 @@ button svg {
   overflow-wrap: anywhere;
 }
 
+.review-focus {
+  box-shadow: 0 0 0 3px rgba(32, 148, 162, 0.18), 0 0 0 1px rgba(32, 148, 162, 0.45), var(--shadow);
+  position: relative;
+  z-index: 2;
+}
+
+.reviewer-guide {
+  background: #ffffff;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  bottom: 18px;
+  box-shadow: 0 16px 48px rgba(14, 42, 51, 0.18);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  max-width: 720px;
+  padding: 16px;
+  position: fixed;
+  right: 18px;
+  width: min(720px, calc(100vw - 36px));
+  z-index: 60;
+}
+
+.reviewer-guide[hidden] {
+  display: none;
+}
+
+.reviewer-progress {
+  background: var(--line);
+  border-radius: 999px;
+  grid-column: 1 / -1;
+  height: 6px;
+  overflow: hidden;
+}
+
+.reviewer-progress::before {
+  background: var(--cyan);
+  content: "";
+  display: block;
+  height: 100%;
+  width: var(--progress, 0%);
+}
+
+.reviewer-guide span {
+  color: var(--muted);
+  display: block;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.reviewer-guide h2 {
+  font-size: 18px;
+  margin-top: 4px;
+}
+
+.reviewer-guide p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+  margin-top: 6px;
+}
+
+.reviewer-facts {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 12px 0 0;
+}
+
+.reviewer-facts div {
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  min-width: 0;
+  padding: 8px;
+}
+
+.reviewer-facts dt {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.reviewer-facts dd {
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.25;
+  margin: 5px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.reviewer-actions {
+  align-items: start;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: auto auto auto;
+}
+
 @media (max-width: 1400px) {
   .workspace {
     gap: 12px;
@@ -1266,8 +1379,21 @@ button svg {
   .decision-strip,
   .readiness-grid,
   .proof-object-strip,
+  .proof-actions,
+  .reviewer-facts,
   .verifier-result {
     grid-template-columns: 1fr;
+  }
+
+  .reviewer-guide {
+    bottom: 10px;
+    grid-template-columns: 1fr;
+    right: 10px;
+    width: calc(100vw - 20px);
+  }
+
+  .reviewer-actions {
+    grid-template-columns: 1fr 1fr 42px;
   }
 
   .route-node::before {

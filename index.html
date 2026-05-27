@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TradeFlow Control Desk</title>
-    <link rel="stylesheet" href="./styles.css?v=20260527-attached-ui" />
+    <link rel="stylesheet" href="./styles.css?v=20260528-reviewer-mode" />
   </head>
   <body>
     <div class="app-shell">
@@ -37,6 +37,10 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>
             Buyer Agent
           </button>
+          <button class="agent-btn" id="reviewerModeBtn" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13" /><path d="M8 12h13" /><path d="M8 18h13" /><path d="M3 6h.01" /><path d="M3 12h.01" /><path d="M3 18h.01" /></svg>
+            Reviewer Mode
+          </button>
           <button class="secondary-btn" id="exportBtn">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11" /><path d="m8 11 4 4 4-4" /><path d="M5 20h14" /></svg>
             Generate proof bundle
@@ -50,7 +54,7 @@
 
       <main class="workspace">
         <aside class="panel left-panel">
-          <section class="panel-section">
+          <section class="panel-section" id="mandatePanel">
             <div class="section-head">
               <h2>Corridor</h2>
               <span class="status-chip" id="corridorStatus">Allowed</span>
@@ -141,7 +145,7 @@
         </aside>
 
         <section class="center-stack">
-          <section class="panel instrument-panel">
+          <section class="panel instrument-panel" id="instrumentPanel">
             <div class="instrument-header">
               <div>
                 <h2>Conditional trade instrument</h2>
@@ -185,7 +189,7 @@
             <div class="route-map" id="routeMap" aria-label="Shipment route timeline"></div>
           </section>
 
-          <section class="panel milestone-panel">
+          <section class="panel milestone-panel" id="milestonePanel">
             <div class="section-head">
               <h2>Milestone gates</h2>
               <span class="small-metric" id="milestoneCount">2 of 6 verified</span>
@@ -227,7 +231,7 @@
         </section>
 
         <aside class="panel right-panel">
-          <section class="panel-section">
+          <section class="panel-section" id="dualReadinessPanel">
             <div class="section-head">
               <h2>DUAL readiness</h2>
               <span class="status-chip review" id="dualModeChip">Checking</span>
@@ -253,7 +257,7 @@
             <p class="readiness-note" id="dualDetail">Checking DUAL status endpoint...</p>
           </section>
 
-          <section class="panel-section">
+          <section class="panel-section" id="proofRailPanel">
             <div class="section-head">
               <h2>Proof rail</h2>
               <span class="status-chip review" id="proofModeChip">Read-only</span>
@@ -292,7 +296,7 @@
             <div class="proof-links" id="proofLinks"></div>
           </section>
 
-          <section class="panel-section">
+          <section class="panel-section" id="verifierPanel">
             <div class="section-head">
               <h2>DUAL token object</h2>
               <span class="small-metric" id="objectSource">seed object</span>
@@ -354,7 +358,23 @@
           <strong id="exportStatus">Not exported</strong>
         </div>
       </footer>
+      <section class="reviewer-guide" id="reviewerGuide" aria-live="polite" hidden>
+        <div class="reviewer-progress" id="reviewerProgress"></div>
+        <div>
+          <span id="reviewerEyebrow">Reviewer mode</span>
+          <h2 id="reviewerTitle">TradeFlow proof walkthrough</h2>
+          <p id="reviewerBody">Follow the proof path from mandate to DUAL explorer.</p>
+          <dl class="reviewer-facts" id="reviewerFacts"></dl>
+        </div>
+        <div class="reviewer-actions">
+          <button class="secondary-btn" id="reviewerPrevBtn">Back</button>
+          <button class="primary-btn" id="reviewerNextBtn">Next</button>
+          <button class="icon-btn" id="reviewerCloseBtn" title="Close reviewer mode" aria-label="Close reviewer mode">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+          </button>
+        </div>
+      </section>
     </div>
-    <script src="./client.js?v=20260527-attached-ui"></script>
+    <script src="./client.js?v=20260528-reviewer-mode"></script>
   </body>
 </html>

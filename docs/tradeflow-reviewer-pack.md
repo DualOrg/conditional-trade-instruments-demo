@@ -8,6 +8,12 @@ Prepared route:
 https://conditional-trade-instruments.vercel.app/?demo=operator-cargo
 ```
 
+Guided reviewer route:
+
+```text
+https://conditional-trade-instruments.vercel.app/?demo=operator-cargo&reviewer=1
+```
+
 Default route:
 
 ```text
@@ -31,6 +37,7 @@ https://github.com/DualOrg/conditional-trade-instruments-demo
 - Verifier level is `dual_readback_rederived`.
 - `Open Object Proof` opens the DUAL object explorer.
 - `Open Template Proof` opens the DUAL template explorer.
+- `Reviewer Mode` walks through instrument, mandate, milestone, DUAL readiness, proof rail, and verifier boundary.
 - The proof rail exposes object, template, state hash, integrity hash, proof bundle, and L2 state-hash links.
 - Public writes remain disabled.
 
@@ -99,3 +106,5 @@ When those are present locally, run:
 ```bash
 npm run demo:entry
 ```
+
+For the production deployment, the caller needs `DEMO_OPERATOR_TOKEN` or `DEMO_OPERATOR_TOKEN_FILE`; DUAL API credentials stay in the Vercel environment. The same sync can be run from GitHub Actions by publishing `docs/tradeflow-demo-entry.workflow.yml` to `.github/workflows/tradeflow-demo-entry.yml` with repository secret `DEMO_OPERATOR_TOKEN`.

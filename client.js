@@ -160,6 +160,83 @@ const initialState = {
 };
 
 let state = loadState();
+let reviewerMode = false;
+let reviewerStepIndex = 0;
+
+const reviewerSteps = [
+  {
+    id: "instrument",
+    targetId: "instrumentPanel",
+    title: "Instrument state",
+    body: "Start with the live commercial state: one SG-AU medical-device instrument, Cargo loaded verified, and Customs cleared next.",
+    facts: () => [
+      ["Instrument", state.instrument.id],
+      ["Face value", formatUsd(state.instrument.valueUsd)],
+      ["Released", formatUsd(releasedAmount())],
+      ["Next gate", nextMilestone()?.name || "Closed"]
+    ]
+  },
+  {
+    id: "mandate",
+    targetId: "mandatePanel",
+    title: "Mandate boundary",
+    body: "The buyer agent is bounded by corridor, commodity class, instrument value, sanctions clearance, and manual review threshold.",
+    facts: () => [
+      ["Buyer agent", state.policy.buyerAgent],
+      ["Corridor", corridorLabel()],
+      ["Commodity", commodityLabel()],
+      ["Ceiling", formatUsd(state.policy.maxInstrumentUsd)]
+    ]
+  },
+  {
+    id: "milestones",
+    targetId: "milestonePanel",
+    title: "Milestone gate",
+    body: "Each payment release waits for evidence and policy evaluation; the verified Cargo loaded gate released the first tranche.",
+    facts: () => [
+      ["Verified", `${verifiedCount()} of ${state.milestones.length}`],
+      ["Gate", "Cargo loaded"],
+      ["Release", formatUsd(state.instrument.valueUsd * 0.2)],
+      ["Evidence", "BOL-8842 + GPS fix"]
+    ]
+  },
+  {
+    id: "readiness",
+    targetId: "dualReadinessPanel",
+    title: "DUAL readiness",
+    body: "Production is reading live DUAL state while public writes stay disabled; write execution is operator-gated.",
+    facts: () => [
+      ["Runtime", `${state.dualStatus?.runtime || "browser"} / ${state.dualStatus?.mode || "local"}`],
+      ["Readback", state.dualStatus?.readbackReady ? "configured" : "seed fallback"],
+      ["Writable", state.dualStatus?.writable ? "event-bus gated" : "disabled"],
+      ["Public writes", String(Boolean(state.dualStatus?.publicWrites))]
+    ]
+  },
+  {
+    id: "proof",
+    targetId: "proofRailPanel",
+    title: "Proof rail",
+    body: "The object and template proof buttons open the block explorer; hashes are re-derived from the DUAL readback.",
+    facts: () => [
+      ["Source", state.dualProof?.source || "pending"],
+      ["Verifier", state.dualProof?.verificationLevel || "pending"],
+      ["Object", shortHash(state.dualProof?.objectId)],
+      ["Template", shortHash(state.dualProof?.templateId)]
+    ]
+  },
+  {
+    id: "verifier",
+    targetId: "verifierPanel",
+    title: "Agent verifier",
+    body: "Agents can evaluate the next gate and get a decision hash without receiving authority to write to DUAL.",
+    facts: () => [
+      ["Decision", state.verifierResult?.result || "Not run"],
+      ["Decision hash", shortHash(state.verifierResult?.decisionHash)],
+      ["Public writes", String(Boolean(state.verifierResult?.publicWrites))],
+      ["Boundary", "read/evaluate/verify only"]
+    ]
+  }
+];
 
 const $ = (id) => document.getElementById(id);
 
@@ -192,6 +269,15 @@ function loadState() {
     };
   } catch {
     return clone(initialState);
+  }
+}
+
+function requestedReviewerMode() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return ["1", "true", "yes"].includes((params.get("reviewer") || "").trim().toLowerCase());
+  } catch {
+    return false;
   }
 }
 
@@ -801,6 +887,71 @@ function setProofAction(id, link, fallbackLabel) {
   element.setAttribute("aria-disabled", "true");
 }
 
+function renderReviewerGuide() {
+  const guide = $("reviewerGuide");
+  document.querySelectorAll(".review-focus").forEach((element) => element.classList.remove("review-focus"));
+
+  if (!reviewerMode) {
+    guide.hidden = true;
+    $("reviewerModeBtn").classList.remove("active");
+    return;
+  }
+
+  const step = reviewerSteps[reviewerStepIndex] || reviewerSteps[0];
+  const target = $(step.targetId);
+  if (target) target.classList.add("review-focus");
+
+  guide.hidden = false;
+  $("reviewerModeBtn").classList.add("active");
+  $("reviewerEyebrow").textContent = `Step ${reviewerStepIndex + 1} of ${reviewerSteps.length}`;
+  $("reviewerTitle").textContent = step.title;
+  $("reviewerBody").textContent = step.body;
+  $("reviewerFacts").innerHTML = step.facts().map(([label, value]) => `
+    <div>
+      <dt>${escapeHtml(label)}</dt>
+      <dd>${escapeHtml(value)}</dd>
+    </div>
+  `).join("");
+  $("reviewerProgress").style.setProperty("--progress", `${((reviewerStepIndex + 1) / reviewerSteps.length) * 100}%`);
+  $("reviewerPrevBtn").disabled = reviewerStepIndex === 0;
+  $("reviewerNextBtn").textContent = reviewerStepIndex === reviewerSteps.length - 1 ? "Finish" : "Next";
+}
+
+function scrollReviewerTarget() {
+  const step = reviewerSteps[reviewerStepIndex] || reviewerSteps[0];
+  const target = $(step.targetId);
+  if (target) target.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+}
+
+async function toggleReviewerMode() {
+  reviewerMode = !reviewerMode;
+  if (reviewerMode) reviewerStepIndex = 0;
+  await render();
+  if (reviewerMode) scrollReviewerTarget();
+}
+
+async function advanceReviewerStep() {
+  if (reviewerStepIndex >= reviewerSteps.length - 1) {
+    reviewerMode = false;
+    await render();
+    return;
+  }
+  reviewerStepIndex += 1;
+  await render();
+  scrollReviewerTarget();
+}
+
+async function retreatReviewerStep() {
+  reviewerStepIndex = Math.max(0, reviewerStepIndex - 1);
+  await render();
+  scrollReviewerTarget();
+}
+
+async function closeReviewerMode() {
+  reviewerMode = false;
+  await render();
+}
+
 function renderMilestones() {
   $("milestoneGrid").innerHTML = state.milestones.map((milestone) => `
     <article class="milestone ${milestoneClass(milestone)}">
@@ -941,6 +1092,7 @@ async function render() {
   renderDualProof();
   renderVerifier();
   renderAudit();
+  renderReviewerGuide();
 }
 
 async function savePolicy() {
@@ -1110,6 +1262,10 @@ async function resetDemo() {
 }
 
 function wireEvents() {
+  $("reviewerModeBtn").addEventListener("click", toggleReviewerMode);
+  $("reviewerPrevBtn").addEventListener("click", retreatReviewerStep);
+  $("reviewerNextBtn").addEventListener("click", advanceReviewerStep);
+  $("reviewerCloseBtn").addEventListener("click", closeReviewerMode);
   $("savePolicyBtn").addEventListener("click", savePolicy);
   $("attachEvidenceBtn").addEventListener("click", attachEvidence);
   $("verifyBtn").addEventListener("click", verifyNextGate);
@@ -1142,5 +1298,6 @@ function wireEvents() {
 
 bindInputs();
 wireEvents();
+reviewerMode = requestedReviewerMode();
 render();
 Promise.all([refreshDualStatus(), refreshDualProof()]).then(render);

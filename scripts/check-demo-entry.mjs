@@ -2,6 +2,7 @@ const baseUrl = (process.env.DEMO_BASE_URL || "https://conditional-trade-instrum
 
 const envNames = [
   "DEMO_OPERATOR_TOKEN",
+  "DEMO_OPERATOR_TOKEN_FILE",
   "DUAL_API_KEY",
   "DUAL_API_URL",
   "DUAL_CONDITIONAL_TRADE_TEMPLATE_ID",
@@ -44,7 +45,7 @@ const proofResponse = await readJson("/api/proof");
 const status = statusResponse.body || {};
 const proof = proofResponse.body || {};
 const proofObject = proof.proof?.instrument?.object || {};
-const operatorReady = Boolean(process.env.DEMO_OPERATOR_TOKEN);
+const operatorReady = Boolean(process.env.DEMO_OPERATOR_TOKEN || process.env.DEMO_OPERATOR_TOKEN_FILE);
 const liveSyncRunnable = operatorReady && Boolean(status.writable);
 
 const report = {

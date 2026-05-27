@@ -45,6 +45,12 @@ const home = await fetch(baseUrl);
 assert(home.ok, "home page loads");
 assert((await home.text()).includes("TradeFlow Control Desk"), "home page includes demo title");
 
+const reviewerHome = await fetch(`${baseUrl}/?demo=operator-cargo&reviewer=1`);
+const reviewerHtml = await reviewerHome.text();
+assert(reviewerHome.ok, "prepared reviewer route loads");
+assert(reviewerHtml.includes("reviewerGuide"), "prepared reviewer route includes reviewer guide shell");
+assert(reviewerHtml.includes("Open Object Proof"), "prepared reviewer route includes primary proof action");
+
 const status = await request("/api/dual/status");
 assert(status.response.ok, "status endpoint returns 200");
 assert(status.body.publicWrites === false, "status endpoint reports no public writes");

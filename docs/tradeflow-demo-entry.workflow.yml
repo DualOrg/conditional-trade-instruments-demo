@@ -1,0 +1,46 @@
+name: TradeFlow Demo Entry Sync
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "TradeFlow deployment URL"
+        required: false
+        default: "https://conditional-trade-instruments.vercel.app"
+
+jobs:
+  sync-demo-entry:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate scripts
+        run: npm run check
+
+      - name: Read production proof status
+        run: npm run demo:ready
+        env:
+          DEMO_BASE_URL: ${{ inputs.base_url }}
+
+      - name: Sync canonical demo entry
+        run: npm run demo:entry
+        env:
+          DEMO_BASE_URL: ${{ inputs.base_url }}
+          DEMO_OPERATOR_TOKEN: ${{ secrets.DEMO_OPERATOR_TOKEN }}
+
+      - name: Verify synced demo entry
+        run: npm run demo:ready
+        env:
+          DEMO_BASE_URL: ${{ inputs.base_url }}

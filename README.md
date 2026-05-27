@@ -14,6 +14,12 @@ Prepared demo entry:
 https://conditional-trade-instruments.vercel.app/?demo=operator-cargo
 ```
 
+Guided reviewer entry:
+
+```text
+https://conditional-trade-instruments.vercel.app/?demo=operator-cargo&reviewer=1
+```
+
 Open:
 
 ```text
@@ -177,10 +183,12 @@ With the production operator environment loaded:
 npm run demo:entry
 ```
 
-This syncs the canonical Cargo loaded demo entry into the configured DUAL object and reads the proof bundle back. The command prints object/template ids and proof hashes only; it does not print secrets.
+This syncs the canonical Cargo loaded demo entry into the configured DUAL object and reads the proof bundle back. For the production deployment, the local caller only needs `DEMO_OPERATOR_TOKEN` or `DEMO_OPERATOR_TOKEN_FILE`; DUAL read/write credentials stay in the deployment environment. The command prints object/template ids and proof hashes only; it does not print secrets.
 
 To check proof/readiness without executing a write:
 
 ```text
 npm run demo:ready
 ```
+
+Controlled operator sync can also run from GitHub Actions using the template in `docs/tradeflow-demo-entry.workflow.yml`. Publishing that template as `.github/workflows/tradeflow-demo-entry.yml` requires a GitHub token with `workflow` scope and repository secret `DEMO_OPERATOR_TOKEN`.

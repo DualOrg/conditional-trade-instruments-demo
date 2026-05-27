@@ -10,6 +10,12 @@ Use this URL for the prepared operator view:
 https://conditional-trade-instruments.vercel.app/?demo=operator-cargo
 ```
 
+Use this URL when a reviewer should be guided through the story:
+
+```text
+https://conditional-trade-instruments.vercel.app/?demo=operator-cargo&reviewer=1
+```
+
 The demo entry shows:
 
 - corridor: Singapore to Australia;
@@ -29,8 +35,9 @@ The demo entry shows:
 3. Confirm Proof rail shows `source dual_readback` and verifier level `dual_readback_rederived`.
 4. Open `Open Object Proof` from the Proof rail.
 5. Return to the app and open `Open Template Proof`.
-6. Use the top action `VERIFY NEXT GATE` only when you want to demonstrate the local verifier flow for the next milestone.
-7. Use `GENERATE PROOF BUNDLE` to refresh the proof bundle view without exposing public writes.
+6. Use `REVIEWER MODE` when the audience needs the guided mandate -> milestone -> DUAL proof -> verifier path.
+7. Use the top action `VERIFY NEXT GATE` only when you want to demonstrate the local verifier flow for the next milestone.
+8. Use `GENERATE PROOF BUNDLE` to refresh the proof bundle view without exposing public writes.
 
 Use `docs/tradeflow-demo-script.md` for the short talk track and `docs/tradeflow-reviewer-pack.md` for the handoff checklist.
 
@@ -42,10 +49,16 @@ The prepared URL is browser-local presentation state. To write the matching demo
 npm run demo:entry
 ```
 
-Required environment:
+For the production deployment, the caller needs one of:
 
 ```text
 DEMO_OPERATOR_TOKEN
+DEMO_OPERATOR_TOKEN_FILE
+```
+
+The production deployment already carries the DUAL read/write environment. When running the endpoint locally, the local server also needs:
+
+```text
 DUAL_API_KEY
 DUAL_CONDITIONAL_TRADE_TEMPLATE_ID
 DUAL_CONDITIONAL_TRADE_OBJECT_ID
@@ -54,6 +67,8 @@ DUAL_PERSISTENCE_MODE=dual
 ```
 
 The script calls the operator-gated `/api/instruments/sync` endpoint, then reads `/api/proof` back and prints only non-secret proof identifiers and hashes.
+
+Controlled operator sync can run in GitHub Actions using `docs/tradeflow-demo-entry.workflow.yml` as the workflow file. Publish it to `.github/workflows/tradeflow-demo-entry.yml` only from an account/token with `workflow` scope and repository secret `DEMO_OPERATOR_TOKEN`; it writes only through the existing operator-gated production endpoint.
 
 To check readiness without executing a write:
 

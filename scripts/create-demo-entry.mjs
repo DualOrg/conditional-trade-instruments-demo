@@ -2,12 +2,19 @@ import {
   deriveProofHashes,
   normalizeInstrumentProperties
 } from "../api/_dual.js";
+import { readFileSync } from "node:fs";
 
 const baseUrl = (process.env.DEMO_BASE_URL || "https://conditional-trade-instruments.vercel.app").replace(/\/+$/, "");
-const operatorToken = process.env.DEMO_OPERATOR_TOKEN || "";
+const operatorToken = process.env.DEMO_OPERATOR_TOKEN || readOperatorTokenFile();
 
 if (!operatorToken) {
-  throw new Error("DEMO_OPERATOR_TOKEN is required to create the live TradeFlow demo entry.");
+  throw new Error("DEMO_OPERATOR_TOKEN or DEMO_OPERATOR_TOKEN_FILE is required to create the live TradeFlow demo entry.");
+}
+
+function readOperatorTokenFile() {
+  const filePath = process.env.DEMO_OPERATOR_TOKEN_FILE || "";
+  if (!filePath) return "";
+  return readFileSync(filePath, "utf8").trim();
 }
 
 async function request(path, options = {}) {
