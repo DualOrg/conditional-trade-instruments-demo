@@ -1,20 +1,22 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap");
+
 :root {
-  --bg: #f4f6f7;
+  --bg: #f4f7f8;
   --surface: #ffffff;
-  --surface-soft: #f8fafb;
-  --surface-strong: #eef4f6;
-  --ink: #131b1f;
-  --muted: #647276;
-  --faint: #8d9a9e;
-  --line: #dce4e7;
-  --line-strong: #b8c6cb;
-  --cyan: #00a8c8;
-  --cyan-dark: #087d93;
-  --green: #138a61;
-  --amber: #c57b13;
-  --red: #b63b35;
+  --surface-soft: #f8fbfc;
+  --surface-strong: #eaf6f8;
+  --ink: #0e2a33;
+  --muted: #3a5560;
+  --faint: #6b838c;
+  --line: #dfe8eb;
+  --line-strong: #c9d6da;
+  --cyan: #2094a2;
+  --cyan-dark: #155f69;
+  --green: #2094a2;
+  --amber: #c28a00;
+  --red: #b43a3e;
   --violet: #6d5bd0;
-  --shadow: 0 18px 42px rgba(22, 34, 39, 0.08);
+  --shadow: 0 1px 2px rgba(14, 42, 51, 0.04), 0 8px 24px rgba(14, 42, 51, 0.04);
   color-scheme: light;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
@@ -40,8 +42,7 @@ button {
 }
 
 button svg,
-.brand-mark svg,
-.rail-button svg {
+.brand-mark svg {
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -49,56 +50,16 @@ button svg,
   stroke-width: 1.85;
 }
 
-.nav-rail {
-  align-items: center;
-  background: #091116;
-  bottom: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  left: 0;
-  padding: 84px 10px 16px;
-  position: fixed;
-  top: 0;
-  width: 58px;
-  z-index: 10;
-}
-
-.rail-button {
-  align-items: center;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  color: #d6e7eb;
-  display: inline-flex;
-  height: 38px;
-  justify-content: center;
-  padding: 0;
-  width: 38px;
-}
-
-.rail-button.active,
-.rail-button:hover {
-  background: rgba(0, 168, 200, 0.16);
-  border-color: rgba(0, 168, 200, 0.42);
-  color: #70e8ff;
-}
-
-.rail-button svg {
-  height: 20px;
-  width: 20px;
-}
-
 .app-shell {
   min-height: 100vh;
-  padding: 16px 16px 16px 74px;
+  padding: 10px 12px 12px;
 }
 
 .topbar,
 .workspace,
 .settlement-bar {
   margin: 0 auto;
-  max-width: 1560px;
+  max-width: 1580px;
 }
 
 .topbar {
@@ -108,11 +69,11 @@ button svg,
   border-radius: 8px;
   box-shadow: var(--shadow);
   display: flex;
-  gap: 16px;
+  gap: 14px;
   justify-content: space-between;
-  margin-bottom: 14px;
-  min-height: 74px;
-  padding: 14px 16px;
+  margin-bottom: 12px;
+  min-height: 68px;
+  padding: 10px 12px;
 }
 
 .brand-block {
@@ -125,18 +86,18 @@ button svg,
 .brand-mark {
   align-items: center;
   background: #101b20;
-  border-radius: 8px;
+  border-radius: 7px;
   color: #ecfbff;
   display: grid;
-  height: 46px;
+  height: 42px;
   justify-items: center;
-  width: 46px;
+  width: 42px;
 }
 
 .wordmark {
   border-right: 1px solid var(--line);
   color: var(--cyan-dark);
-  font-size: 24px;
+  font-size: 23px;
   font-weight: 900;
   letter-spacing: 0;
   line-height: 1;
@@ -155,7 +116,7 @@ p {
 }
 
 h1 {
-  font-size: 21px;
+  font-size: 20px;
   line-height: 1.08;
   letter-spacing: 0;
 }
@@ -163,7 +124,7 @@ h1 {
 .brand-block p,
 .instrument-header p {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.35;
   margin-top: 4px;
 }
@@ -188,10 +149,10 @@ h1 {
 .header-meta span {
   border-left: 1px solid var(--line);
   color: var(--ink);
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 750;
   line-height: 1.2;
-  padding: 0 14px;
+  padding: 0 12px;
   white-space: nowrap;
 }
 
@@ -202,15 +163,15 @@ h1 {
 
 .workspace {
   display: grid;
-  gap: 14px;
-  grid-template-columns: minmax(286px, 0.9fr) minmax(600px, 1.8fr) minmax(350px, 1.05fr);
+  gap: 12px;
+  grid-template-columns: minmax(286px, 0.88fr) minmax(600px, 1.78fr) minmax(350px, 1.04fr);
 }
 
 .panel {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 8px;
-  box-shadow: var(--shadow);
+  box-shadow: 0 1px 2px rgba(14, 42, 51, 0.03);
   min-width: 0;
 }
 
@@ -1169,7 +1130,7 @@ button svg {
   .nav-rail {
     display: none;
   }
-
+  
   .app-shell {
     padding: 10px;
   }
