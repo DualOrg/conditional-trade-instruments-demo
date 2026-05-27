@@ -56,6 +56,18 @@ assert(current.response.ok, "current instrument endpoint degrades safely");
 assert(typeof current.body.available === "boolean", "current instrument endpoint reports availability");
 assert(current.body.properties?.instrument_id === "CTI-SG-AU-001", "current instrument endpoint returns seed properties");
 
+const apiProof = await request("/api/proof");
+assert(apiProof.response.ok, "proof endpoint returns 200");
+assert(apiProof.body.publicWrites === false, "proof endpoint reports no public writes");
+assert(apiProof.body.proof?.bundle_hash, "proof endpoint returns bundle hash");
+assert(Array.isArray(apiProof.body.links), "proof endpoint returns explorer links array");
+if (apiProof.body.proof?.object?.readback_ready) {
+  const objectExplorer = apiProof.body.links.find((link) => link.id === "dual-blockexplorer-object");
+  assert(objectExplorer?.href?.includes("explorer-testnet.dual.network/objects/"), "proof endpoint links DUAL object to block explorer");
+  assert(apiProof.body.proof.instrument?.object?.state_hash, "proof endpoint exposes DUAL state hash");
+  assert(apiProof.body.proof.instrument?.object?.integrity_hash, "proof endpoint exposes DUAL integrity hash");
+}
+
 const approvedEvaluation = await request("/api/instruments/evaluate", {
   method: "POST",
   body: {

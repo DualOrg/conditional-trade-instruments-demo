@@ -29,6 +29,20 @@ const initialState = {
     decisionHash: "",
     publicWrites: false
   },
+  dualProof: {
+    checked: false,
+    ok: false,
+    source: "pending",
+    objectId: "",
+    templateId: "",
+    stateHash: "",
+    integrityHash: "",
+    bundleHash: "",
+    verificationLevel: "pending",
+    verificationOk: false,
+    hashes: {},
+    links: []
+  },
   policy: {
     buyerAgent: "procurement-agent.au",
     maxInstrumentUsd: 180000,
@@ -163,6 +177,7 @@ function loadState() {
       ...parsed,
       dualStatus: { ...clone(initialState.dualStatus), ...(parsed.dualStatus || {}) },
       verifierResult: { ...clone(initialState.verifierResult), ...(parsed.verifierResult || {}) },
+      dualProof: { ...clone(initialState.dualProof), ...(parsed.dualProof || {}) },
       policy: { ...clone(initialState.policy), ...(parsed.policy || {}) },
       instrument: {
         ...clone(initialState.instrument),
@@ -493,6 +508,41 @@ async function refreshDualStatus() {
   }
 }
 
+async function refreshDualProof() {
+  try {
+    const response = await fetch("/api/proof", {
+      headers: { accept: "application/json" }
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload?.error?.message || `HTTP ${response.status}`);
+    const proof = payload.proof || {};
+    const proofObject = proof.instrument?.object || {};
+    state.dualProof = {
+      ...clone(initialState.dualProof),
+      checked: true,
+      ok: Boolean(payload.ok),
+      source: proof.source || "unknown",
+      objectId: proof.object?.object_id || proofObject.object_id || "",
+      templateId: proof.template?.template_id || proofObject.template_id || "",
+      stateHash: proofObject.state_hash || "",
+      integrityHash: proofObject.integrity_hash || "",
+      bundleHash: proof.bundle_hash || "",
+      verificationLevel: payload.verification?.verificationLevel || "pending",
+      verificationOk: Boolean(payload.verification?.ok),
+      hashes: proof.hashes || {},
+      links: payload.links || proof.links || []
+    };
+  } catch (error) {
+    state.dualProof = {
+      ...clone(initialState.dualProof),
+      checked: true,
+      source: "unavailable",
+      verificationLevel: "unavailable",
+      error: error.message || "Proof endpoint unavailable"
+    };
+  }
+}
+
 async function refreshHashes() {
   const instrumentPayload = JSON.stringify({
     instrument: state.instrument,
@@ -626,6 +676,44 @@ function renderVerifier() {
   $("publicWrites").textContent = String(Boolean(result.publicWrites));
 }
 
+function renderDualProof() {
+  const proof = state.dualProof || clone(initialState.dualProof);
+  const hashes = proof.hashes || {};
+  $("instrumentHash").textContent = shortHash(hashes.instrument_hash || state.instrument.hashes.instrument);
+  $("policyHash").textContent = shortHash(hashes.policy_hash || state.instrument.hashes.policy);
+  $("eventHash").textContent = shortHash(hashes.event_hash || state.instrument.hashes.event);
+  $("settlementHash").textContent = shortHash(hashes.settlement_hash || state.instrument.hashes.settlement);
+  $("stateHash").textContent = shortHash(proof.stateHash);
+  $("integrityHash").textContent = shortHash(proof.integrityHash);
+  $("bundleHash").textContent = shortHash(proof.bundleHash);
+  $("proofVerificationLevel").textContent = proof.verificationOk
+    ? proof.verificationLevel
+    : proof.checked
+      ? proof.error || "proof pending"
+      : "checking proof";
+  $("proofObjectId").textContent = proof.objectId ? shortHash(proof.objectId) : "pending";
+  $("proofTemplateId").textContent = proof.templateId ? shortHash(proof.templateId) : "pending";
+  $("proofSource").textContent = proof.source || "pending";
+  renderProofLinks(proof.links || []);
+}
+
+function renderProofLinks(links = []) {
+  const uniqueLinks = [...new Map(links
+    .filter((link) => link?.href)
+    .map((link) => [link.id || link.href, link])).values()];
+  if (!uniqueLinks.length) {
+    $("proofLinks").innerHTML = `<div class="proof-link-empty">DUAL block explorer links appear after proof readback.</div>`;
+    return;
+  }
+  $("proofLinks").innerHTML = uniqueLinks.slice(0, 6).map((link) => `
+    <a class="proof-link ${escapeHtml(link.source || "")}" href="${escapeHtml(link.href)}" target="_blank" rel="noreferrer">
+      <span>${escapeHtml(link.label || "DUAL block explorer")}</span>
+      <strong>${escapeHtml(shortHash(link.value || link.detail || link.href))}</strong>
+      <small>${escapeHtml(link.detail || "Open proof")}</small>
+    </a>
+  `).join("");
+}
+
 function renderMilestones() {
   $("milestoneGrid").innerHTML = state.milestones.map((milestone) => `
     <article class="milestone ${milestoneClass(milestone)}">
@@ -741,10 +829,6 @@ async function render() {
   $("evidencePacket").textContent = state.lastDecision.evidence;
   $("paymentRailLabel").textContent = paymentRailLabel();
   $("schemaPanel").textContent = JSON.stringify(currentToken()[state.selectedTab], null, 2);
-  $("instrumentHash").textContent = shortHash(state.instrument.hashes.instrument);
-  $("policyHash").textContent = shortHash(state.instrument.hashes.policy);
-  $("eventHash").textContent = shortHash(state.instrument.hashes.event);
-  $("settlementHash").textContent = shortHash(state.instrument.hashes.settlement);
   $("auditCount").textContent = `${state.audit.length} events`;
   $("stateMachine").textContent = state.instrument.state === "Settled"
     ? "Issued -> Milestone verified -> Payment released -> Settled"
@@ -767,6 +851,7 @@ async function render() {
   renderEvidenceTable();
   renderPayments();
   renderDualReadiness();
+  renderDualProof();
   renderVerifier();
   renderAudit();
 }
@@ -881,6 +966,7 @@ async function exportProof() {
     evidence: shortHash(state.instrument.hashes.settlement),
     tone: "ready"
   };
+  await refreshDualProof();
   await render();
 }
 
@@ -932,6 +1018,7 @@ async function resetDemo() {
   state = clone(initialState);
   bindInputs();
   await refreshDualStatus();
+  await refreshDualProof();
   await render();
 }
 
@@ -969,4 +1056,4 @@ function wireEvents() {
 bindInputs();
 wireEvents();
 render();
-refreshDualStatus().then(render);
+Promise.all([refreshDualStatus(), refreshDualProof()]).then(render);

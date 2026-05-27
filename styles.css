@@ -823,6 +823,39 @@ button svg {
   gap: 8px;
 }
 
+.proof-object-strip {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 10px;
+}
+
+.proof-object-strip div {
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  min-width: 0;
+  padding: 9px;
+}
+
+.proof-object-strip span,
+.proof-links-head {
+  color: var(--muted);
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.proof-object-strip strong {
+  display: block;
+  font-size: 12px;
+  line-height: 1.25;
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+}
+
 .readiness-grid {
   display: grid;
   gap: 8px;
@@ -885,6 +918,61 @@ button svg {
 
 .proof-list.compact div {
   background: var(--surface);
+}
+
+.proof-links-head {
+  margin: 12px 0 8px;
+}
+
+.proof-links {
+  display: grid;
+  gap: 8px;
+}
+
+.proof-link,
+.proof-link-empty {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: block;
+  padding: 10px;
+  text-decoration: none;
+}
+
+.proof-link {
+  background: #f7fbfc;
+  color: var(--ink);
+}
+
+.proof-link:hover {
+  border-color: rgba(0, 168, 200, 0.5);
+  box-shadow: inset 3px 0 0 var(--cyan);
+}
+
+.proof-link span,
+.proof-link-empty {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.proof-link strong {
+  color: var(--cyan-dark);
+  display: block;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.35;
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+}
+
+.proof-link small {
+  color: var(--muted);
+  display: block;
+  font-size: 12px;
+  line-height: 1.35;
+  margin-top: 4px;
 }
 
 .verifier-card {
@@ -1129,6 +1217,7 @@ button svg {
   .milestone-grid,
   .decision-strip,
   .readiness-grid,
+  .proof-object-strip,
   .verifier-result {
     grid-template-columns: 1fr;
   }

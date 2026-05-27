@@ -267,6 +267,41 @@
 
           <section class="panel-section">
             <div class="section-head">
+              <h2>Proof Rail</h2>
+              <span class="status-chip review" id="proofModeChip">Read-only</span>
+            </div>
+            <div class="proof-object-strip">
+              <div>
+                <span>Object</span>
+                <strong id="proofObjectId">pending</strong>
+              </div>
+              <div>
+                <span>Template</span>
+                <strong id="proofTemplateId">pending</strong>
+              </div>
+              <div>
+                <span>Source</span>
+                <strong id="proofSource">pending</strong>
+              </div>
+            </div>
+            <div class="proof-list">
+              <div><span>Instrument hash</span><code id="instrumentHash">pending</code></div>
+              <div><span>Policy hash</span><code id="policyHash">pending</code></div>
+              <div><span>Last event hash</span><code id="eventHash">pending</code></div>
+              <div><span>Settlement proof</span><code id="settlementHash">pending</code></div>
+              <div><span>DUAL state hash</span><code id="stateHash">pending</code></div>
+              <div><span>DUAL integrity hash</span><code id="integrityHash">pending</code></div>
+              <div><span>Proof bundle</span><code id="bundleHash">pending</code></div>
+              <div><span>Verifier level</span><code id="proofVerificationLevel">checking proof</code></div>
+            </div>
+            <div class="proof-links-head">
+              <span>DUAL block explorer links</span>
+            </div>
+            <div class="proof-links" id="proofLinks"></div>
+          </section>
+
+          <section class="panel-section">
+            <div class="section-head">
               <h2>DUAL Token Object</h2>
               <span class="small-metric" id="objectSource">seed object</span>
             </div>
@@ -276,19 +311,6 @@
               <button class="schema-tab" data-tab="compliance">Compliance</button>
             </div>
             <pre class="code-panel" id="schemaPanel"></pre>
-          </section>
-
-          <section class="panel-section">
-            <div class="section-head">
-              <h2>Proof Rail</h2>
-              <span class="status-chip review" id="proofModeChip">Read-only</span>
-            </div>
-            <div class="proof-list">
-              <div><span>Instrument hash</span><code id="instrumentHash">pending</code></div>
-              <div><span>Policy hash</span><code id="policyHash">pending</code></div>
-              <div><span>Last event hash</span><code id="eventHash">pending</code></div>
-              <div><span>Settlement proof</span><code id="settlementHash">pending</code></div>
-            </div>
           </section>
 
           <section class="panel-section">

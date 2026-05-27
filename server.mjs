@@ -30,6 +30,8 @@ await loadDotEnv();
 
 const port = Number(process.env.PORT || 4176);
 const host = process.env.HOST || "127.0.0.1";
+const dualL3ExplorerBaseUrl = normalizeExternalBaseUrl(process.env.DUAL_L3_EXPLORER_BASE_URL || "https://explorer-testnet.dual.network");
+const dualL2ExplorerBaseUrl = normalizeExternalBaseUrl(process.env.DUAL_L2_EXPLORER_BASE_URL || process.env.DUAL_BLOCKSCOUT_BASE_URL || "https://explorer-test-v2.dual.network");
 const appVersion = "0.1.0";
 const mcpProtocolVersion = "2025-06-18";
 const mcpServerInfo = {
@@ -260,6 +262,7 @@ const mime = {
 
 const routes = new Map([
   ["GET /api/dual/status", dualStatus],
+  ["GET /api/proof", proofApi],
   ["GET /api/instruments/current", currentInstrument],
   ["POST /api/instruments/evaluate", evaluateInstrument],
   ["POST /api/instruments/sync", syncInstrument],
@@ -316,6 +319,18 @@ async function handleApi(request, response, url) {
     }
   };
   await route(wrappedRequest, wrappedResponse);
+}
+
+async function proofApi(_request, response) {
+  const proof = await buildProofBundle(null, { view: "full" });
+  const verification = await verifyProofBundle({ view: "full" });
+  response.status(200).json({
+    ok: true,
+    proof,
+    verification,
+    links: proof.links,
+    publicWrites: false
+  });
 }
 
 async function serveStatic(pathname, response) {
@@ -644,6 +659,44 @@ function objectEnvelope(snapshot) {
   };
 }
 
+function proofExplorerLinks(proof) {
+  const objectId = proof.object?.object_id || proof.instrument?.object?.object_id || "";
+  const templateId = proof.template?.template_id || proof.instrument?.object?.template_id || "";
+  const stateHash = proof.instrument?.object?.state_hash || "";
+  const integrityHash = proof.instrument?.object?.integrity_hash || "";
+  const links = [
+    proofExplorerLink("dual-blockexplorer-object", "DUAL object block explorer", explorerHref("objects", objectId), objectId, "Object state"),
+    proofExplorerLink("dual-blockexplorer-template", "DUAL template block explorer", explorerHref("templates", templateId), templateId, "Template schema"),
+    proofExplorerLink("dual-blockexplorer-state", "State hash proof", explorerHref("objects", objectId), stateHash, "Object state hash"),
+    proofExplorerLink("dual-blockexplorer-integrity", "Integrity hash proof", explorerHref("objects", objectId), integrityHash, "Object integrity hash"),
+    proofExplorerLink("dual-blockexplorer-bundle", "Proof bundle hash", explorerHref("objects", objectId), proof.bundle_hash, "Verifier bundle"),
+    proofExplorerLink("dual-blockexplorer-l2-state", "L2 explorer state hash", l2SearchHref(stateHash), stateHash, "L2 search")
+  ];
+  return links.filter(Boolean);
+}
+
+function proofExplorerLink(id, label, href, value, detail) {
+  if (!href || !value) return null;
+  return {
+    id,
+    label,
+    href,
+    detail,
+    value,
+    source: id.includes("-l2-") ? "l2-explorer" : "l3-explorer"
+  };
+}
+
+function explorerHref(kind, id) {
+  if (!dualL3ExplorerBaseUrl || !id) return "";
+  return `${dualL3ExplorerBaseUrl}/${kind}/${encodeURIComponent(id)}`;
+}
+
+function l2SearchHref(value) {
+  if (!dualL2ExplorerBaseUrl || !value) return "";
+  return `${dualL2ExplorerBaseUrl}/search?query=${encodeURIComponent(value)}`;
+}
+
 async function snapshotFromArgs(args = {}) {
   if (args.instrument === undefined) return currentInstrumentSnapshot();
   validatePlainObject(args.instrument, "instrument");
@@ -834,6 +887,7 @@ function compactProof(proof) {
     hashes: proof.hashes,
     hash_verification: proof.instrument.hashes.verification,
     bundle_hash: proof.bundle_hash,
+    links: proof.links || [],
     caveats: proof.caveats,
     full_resource: "tradeflow://proof"
   };
@@ -982,6 +1036,7 @@ async function buildProofBundle(snapshotInput = null, options = {}) {
       caveats: bundle.caveats
     })
   };
+  proof.links = proofExplorerLinks(proof);
   return view === "compact" ? compactProof(proof) : proof;
 }
 
@@ -1574,4 +1629,8 @@ async function loadDotEnv() {
   } catch {
     // Local .env is optional.
   }
+}
+
+function normalizeExternalBaseUrl(value) {
+  return String(value || "").trim().replace(/\/+$/, "");
 }
