@@ -47,6 +47,7 @@
         <div class="topbar-actions">
           <button class="icon-btn" id="resetBtn" title="Reset demo state" aria-label="Reset demo state">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 7.2V3.9h3.3" /><path d="M5 7.1A8.2 8.2 0 1 1 3.8 14" /></svg>
+            <span class="mobile-action-label">Reset demo</span>
           </button>
           <button class="secondary-btn" id="exportBtn">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11" /><path d="m8 11 4 4 4-4" /><path d="M5 20h14" /></svg>
@@ -240,8 +241,34 @@
         <aside class="panel right-panel">
           <section class="panel-section">
             <div class="section-head">
+              <h2>DUAL Readiness</h2>
+              <span class="status-chip review" id="dualModeChip">Checking</span>
+            </div>
+            <div class="readiness-grid">
+              <div>
+                <span>Runtime</span>
+                <strong id="dualRuntime">checking</strong>
+              </div>
+              <div>
+                <span>Org</span>
+                <strong id="dualOrg">pending</strong>
+              </div>
+              <div>
+                <span>Readback</span>
+                <strong id="dualReadback">pending</strong>
+              </div>
+              <div>
+                <span>Writable</span>
+                <strong id="dualWritable">disabled</strong>
+              </div>
+            </div>
+            <p class="readiness-note" id="dualDetail">Checking DUAL status endpoint...</p>
+          </section>
+
+          <section class="panel-section">
+            <div class="section-head">
               <h2>DUAL Token Object</h2>
-              <span class="small-metric" id="nonceLabel">nonce 1</span>
+              <span class="small-metric" id="objectSource">seed object</span>
             </div>
             <div class="schema-tabs" role="tablist" aria-label="Token object fields">
               <button class="schema-tab active" data-tab="instrument">Instrument</button>
@@ -254,13 +281,34 @@
           <section class="panel-section">
             <div class="section-head">
               <h2>Proof Rail</h2>
-              <span class="status-chip verified">Live</span>
+              <span class="status-chip review" id="proofModeChip">Read-only</span>
             </div>
             <div class="proof-list">
               <div><span>Instrument hash</span><code id="instrumentHash">pending</code></div>
               <div><span>Policy hash</span><code id="policyHash">pending</code></div>
               <div><span>Last event hash</span><code id="eventHash">pending</code></div>
               <div><span>Settlement proof</span><code id="settlementHash">pending</code></div>
+            </div>
+          </section>
+
+          <section class="panel-section">
+            <div class="section-head">
+              <h2>Verifier Gate</h2>
+              <span class="small-metric" id="verifierSource">not run</span>
+            </div>
+            <div class="verifier-card">
+              <div class="verifier-result">
+                <div>
+                  <span>Decision</span>
+                  <strong id="verifierDecision">Not run</strong>
+                </div>
+                <button class="secondary-btn" id="runVerifierBtn">Run verifier API</button>
+              </div>
+              <p id="verifierReason">Calls the public read-only evaluator and returns a decision hash without writing to DUAL.</p>
+              <div class="proof-list compact">
+                <div><span>Decision hash</span><code id="decisionHash">pending</code></div>
+                <div><span>Public writes</span><code id="publicWrites">false</code></div>
+              </div>
             </div>
           </section>
 

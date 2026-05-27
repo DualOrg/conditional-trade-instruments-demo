@@ -10,6 +10,25 @@ const initialState = {
     evidence: "BOL + GPS + inspection",
     tone: "ready"
   },
+  dualStatus: {
+    checked: false,
+    mode: "local",
+    runtime: "browser",
+    orgId: "69b935b4187e903f826bbe71",
+    readbackReady: false,
+    writable: false,
+    publicWrites: false,
+    missing: [],
+    detail: "DUAL status has not been checked yet."
+  },
+  verifierResult: {
+    ran: false,
+    result: "Not run",
+    reason: "Calls the public read-only evaluator and returns a decision hash without writing to DUAL.",
+    source: "not run",
+    decisionHash: "",
+    publicWrites: false
+  },
   policy: {
     buyerAgent: "procurement-agent.au",
     maxInstrumentUsd: 180000,
@@ -142,6 +161,8 @@ function loadState() {
     return {
       ...clone(initialState),
       ...parsed,
+      dualStatus: { ...clone(initialState.dualStatus), ...(parsed.dualStatus || {}) },
+      verifierResult: { ...clone(initialState.verifierResult), ...(parsed.verifierResult || {}) },
       policy: { ...clone(initialState.policy), ...(parsed.policy || {}) },
       instrument: {
         ...clone(initialState.instrument),
@@ -395,9 +416,81 @@ function currentToken() {
       sanctions_clear: state.policy.sanctionsClear,
       customs_preclearance: state.policy.customsPreclearance,
       blocked_actions: blockedCount(),
-      latest_policy_hash: shortHash(state.instrument.hashes.policy)
+      latest_policy_hash: shortHash(state.instrument.hashes.policy),
+      dual_readback_ready: Boolean(state.dualStatus?.readbackReady),
+      public_writes: Boolean(state.dualStatus?.publicWrites)
     }
   };
+}
+
+function currentInstrumentProperties() {
+  const next = nextMilestone();
+  const released = Math.round(releasedAmount());
+  return {
+    instrument_id: state.instrument.id,
+    buyer: state.instrument.buyer,
+    supplier: state.instrument.supplier,
+    buyer_agent: state.policy.buyerAgent,
+    corridor: state.instrument.corridor,
+    commodity_class: state.instrument.commodity,
+    payment_rail: state.instrument.paymentRail,
+    state: state.instrument.state,
+    value_usd: state.instrument.valueUsd,
+    max_instrument_usd: state.policy.maxInstrumentUsd,
+    review_threshold_usd: state.policy.reviewThreshold,
+    sanctions_clear: state.policy.sanctionsClear,
+    customs_preclearance: state.policy.customsPreclearance,
+    current_milestone: next ? next.name : "Closed",
+    verified_milestones: verifiedCount(),
+    released_usd: released,
+    remaining_usd: Math.max(0, Math.round(state.instrument.valueUsd - released)),
+    blocked_actions: blockedCount(),
+    policy_version: state.policyVersion,
+    policy_hash: state.instrument.hashes.policy,
+    instrument_hash: state.instrument.hashes.instrument,
+    evidence_hash: state.instrument.hashes.event,
+    last_event_hash: state.instrument.hashes.event,
+    settlement_hash: state.instrument.hashes.settlement,
+    last_decision_result: state.lastDecision.result,
+    last_decision_reason: state.lastDecision.reason,
+    updated_at: new Date().toISOString()
+  };
+}
+
+function currentGateRequest() {
+  const next = nextMilestone();
+  return {
+    milestone_id: next?.id || "closed",
+    milestone_name: next?.name || "Closed",
+    corridor: state.instrument.corridor,
+    commodity_class: state.instrument.commodity,
+    release_usd: Math.round(activePaymentAmount()),
+    evidence_attached: Boolean(next?.evidenceAttached),
+    evidence_type: next?.evidence || "Settlement proof",
+    customs_preclearance: state.policy.customsPreclearance
+  };
+}
+
+async function refreshDualStatus() {
+  try {
+    const response = await fetch("/api/dual/status", {
+      headers: { accept: "application/json" }
+    });
+    const payload = await response.json();
+    state.dualStatus = {
+      ...clone(initialState.dualStatus),
+      ...payload,
+      checked: true,
+      error: response.ok ? "" : `HTTP ${response.status}`
+    };
+  } catch (error) {
+    state.dualStatus = {
+      ...clone(initialState.dualStatus),
+      checked: true,
+      error: error.message || "Status check failed",
+      detail: "DUAL status endpoint is unavailable in this runtime. The UI remains local-only."
+    };
+  }
 }
 
 async function refreshHashes() {
@@ -425,6 +518,39 @@ async function refreshHashes() {
 }
 
 function renderRouteMap() {
+  const view = state.selectedView || "timeline";
+  $("routeMap").className = `route-map ${view === "evidence" ? "evidence-view" : view === "payments" ? "payment-view" : ""}`;
+
+  if (view === "evidence") {
+    $("routeMap").innerHTML = state.milestones.map((milestone) => {
+      const status = milestone.status === "verified" ? "ready" : milestone.status === "blocked" ? "blocked" : milestone.status === "active" ? "active" : "";
+      const evidenceState = milestone.evidenceAttached ? "Attached" : milestone.status === "verified" ? "Verified" : "Waiting";
+      return `
+        <article class="route-evidence-card ${status}">
+          <span>${escapeHtml(visibleStatus(milestone))}</span>
+          <strong>${escapeHtml(milestone.evidence)}</strong>
+          <small>${escapeHtml(milestone.name)} · ${escapeHtml(evidenceState)} · ${escapeHtml(milestone.place)}</small>
+        </article>
+      `;
+    }).join("");
+    return;
+  }
+
+  if (view === "payments") {
+    const paymentMilestones = state.milestones.filter((milestone) => milestone.releasePct > 0);
+    $("routeMap").innerHTML = paymentMilestones.map((milestone) => {
+      const status = milestone.status === "verified" ? "released" : milestone.status === "blocked" ? "blocked" : "queued";
+      return `
+        <article class="route-payment-card ${status}">
+          <span>${escapeHtml(status)}</span>
+          <strong>${formatUsd(state.instrument.valueUsd * milestone.releasePct)}</strong>
+          <small>${escapeHtml(milestone.name)} · ${escapeHtml(paymentRailLabel())}</small>
+        </article>
+      `;
+    }).join("");
+    return;
+  }
+
   const cargo = state.milestones.find((milestone) => milestone.id === "loaded");
   const customs = state.milestones.find((milestone) => milestone.id === "customs");
   const inspection = state.milestones.find((milestone) => milestone.id === "inspection");
@@ -463,6 +589,41 @@ function renderRouteMap() {
       <small>${escapeHtml(node.detail)}</small>
     </article>
   `).join("");
+}
+
+function renderDualReadiness() {
+  const status = state.dualStatus || {};
+  const modeLabel = status.writable
+    ? "Operator gated"
+    : status.readbackReady
+      ? "Read-linked"
+      : status.checked
+        ? "Read-only"
+        : "Checking";
+  const tone = status.writable || status.readbackReady ? "verified" : status.error ? "blocked" : "review";
+  const missing = Array.isArray(status.missing) && status.missing.length ? ` Missing: ${status.missing.join(", ")}.` : "";
+
+  $("dualModeChip").textContent = modeLabel;
+  $("dualModeChip").className = `status-chip ${tone}`;
+  $("dualRuntime").textContent = `${status.runtime || "browser"} / ${status.mode || "local"}`;
+  $("dualOrg").textContent = status.orgId || "not configured";
+  $("dualReadback").textContent = status.readbackReady ? "configured" : "seed fallback";
+  $("dualWritable").textContent = status.writable ? "event-bus gated" : "disabled";
+  $("dualDetail").textContent = `${status.detail || "Status pending."}${missing}`;
+  $("objectSource").textContent = status.readbackReady ? "DUAL readback" : `seed object · nonce ${state.nonce}`;
+  $("proofModeChip").textContent = modeLabel;
+  $("proofModeChip").className = `status-chip ${tone}`;
+  $("publicWrites").textContent = String(Boolean(status.publicWrites || state.verifierResult?.publicWrites));
+}
+
+function renderVerifier() {
+  const result = state.verifierResult || clone(initialState.verifierResult);
+  const decision = result.result || "Not run";
+  $("verifierSource").textContent = result.source || "not run";
+  $("verifierDecision").textContent = decision;
+  $("verifierReason").textContent = result.reason || "Calls the public read-only evaluator and returns a decision hash without writing to DUAL.";
+  $("decisionHash").textContent = shortHash(result.decisionHash);
+  $("publicWrites").textContent = String(Boolean(result.publicWrites));
 }
 
 function renderMilestones() {
@@ -579,7 +740,6 @@ async function render() {
   $("policyReason").textContent = state.lastDecision.reason;
   $("evidencePacket").textContent = state.lastDecision.evidence;
   $("paymentRailLabel").textContent = paymentRailLabel();
-  $("nonceLabel").textContent = `nonce ${state.nonce}`;
   $("schemaPanel").textContent = JSON.stringify(currentToken()[state.selectedTab], null, 2);
   $("instrumentHash").textContent = shortHash(state.instrument.hashes.instrument);
   $("policyHash").textContent = shortHash(state.instrument.hashes.policy);
@@ -606,6 +766,8 @@ async function render() {
   renderMilestones();
   renderEvidenceTable();
   renderPayments();
+  renderDualReadiness();
+  renderVerifier();
   renderAudit();
 }
 
@@ -722,9 +884,54 @@ async function exportProof() {
   await render();
 }
 
+async function runVerifier() {
+  syncFromInputs();
+  await refreshHashes();
+  const body = {
+    instrument: currentInstrumentProperties(),
+    gate: currentGateRequest()
+  };
+
+  try {
+    const response = await fetch("/api/instruments/evaluate", {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json"
+      },
+      body: JSON.stringify(body)
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload?.error?.message || `Verifier returned HTTP ${response.status}`);
+    const evaluation = payload.evaluation || {};
+    state.verifierResult = {
+      ran: true,
+      result: evaluation.result || "No decision",
+      reason: evaluation.reason || "Verifier returned no reason.",
+      source: evaluation.source || "request",
+      decisionHash: evaluation.proof?.decision_hash || "",
+      publicWrites: Boolean(payload.publicWrites)
+    };
+    addAudit("ok", "Verifier API checked", `${state.verifierResult.result}: ${state.verifierResult.reason}`);
+  } catch (error) {
+    state.verifierResult = {
+      ran: true,
+      result: "Verifier unavailable",
+      reason: error.message || "Verifier API call failed.",
+      source: "browser",
+      decisionHash: "",
+      publicWrites: false
+    };
+    addAudit("warn", "Verifier API unavailable", state.verifierResult.reason);
+  }
+
+  await render();
+}
+
 async function resetDemo() {
   state = clone(initialState);
   bindInputs();
+  await refreshDualStatus();
   await render();
 }
 
@@ -734,6 +941,7 @@ function wireEvents() {
   $("verifyBtn").addEventListener("click", verifyNextGate);
   $("forceBreachBtn").addEventListener("click", forceBreach);
   $("exportBtn").addEventListener("click", exportProof);
+  $("runVerifierBtn").addEventListener("click", runVerifier);
   $("resetBtn").addEventListener("click", resetDemo);
 
   ["corridorSelect", "commoditySelect", "buyerAgent", "maxInstrumentUsd", "reviewThreshold", "sanctionsClear", "customsPreclearance", "instrumentValue", "paymentRail"].forEach((id) => {
@@ -761,3 +969,4 @@ function wireEvents() {
 bindInputs();
 wireEvents();
 render();
+refreshDualStatus().then(render);
