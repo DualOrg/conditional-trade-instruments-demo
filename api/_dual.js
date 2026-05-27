@@ -534,11 +534,33 @@ export function evaluateInstrumentGate(properties, request, context = {}) {
 }
 
 export function updatePayload(objectId, properties, metadata = {}) {
+  return updatePayloadByStyle("direct_custom", objectId, properties, metadata);
+}
+
+export function updatePayloadAttempts(objectId, properties, metadata = {}) {
+  return [
+    { style: "direct_custom", payload: updatePayloadByStyle("direct_custom", objectId, properties, metadata) },
+    { style: "direct_data_custom", payload: updatePayloadByStyle("direct_data_custom", objectId, properties, metadata) }
+  ];
+}
+
+function updatePayloadByStyle(style, objectId, properties, metadata = {}) {
   const custom = {
     ...properties,
     last_event_hash: metadata.event_hash || properties.last_event_hash || "",
     updated_at: new Date().toISOString()
   };
+  if (style === "direct_data_custom") {
+    return {
+      action: {
+        update: {
+          id: objectId,
+          data: { custom }
+        }
+      },
+      metadata
+    };
+  }
   return {
     action: {
       update: {
@@ -551,24 +573,73 @@ export function updatePayload(objectId, properties, metadata = {}) {
 }
 
 export function mintPayload(templateId, properties, metadata = {}) {
+  return mintPayloadByStyle("direct_custom", templateId, properties, metadata);
+}
+
+export function mintPayloadAttempts(templateId, properties, metadata = {}) {
+  return [
+    { style: "direct_custom", payload: mintPayloadByStyle("direct_custom", templateId, properties, metadata) },
+    { style: "direct_data_custom", payload: mintPayloadByStyle("direct_data_custom", templateId, properties, metadata) }
+  ];
+}
+
+function mintPayloadByStyle(style, templateId, properties, metadata = {}) {
+  const custom = {
+    ...properties,
+    updated_at: new Date().toISOString()
+  };
+  if (style === "direct_data_custom") {
+    return {
+      action: {
+        mint: {
+          template_id: templateId,
+          num: 1,
+          data: { custom }
+        }
+      },
+      metadata: mintMetadata(metadata)
+    };
+  }
   return {
     action: {
       mint: {
         template_id: templateId,
         num: 1,
-        custom: {
-          ...properties,
-          updated_at: new Date().toISOString()
-        }
+        custom
       }
     },
-    metadata: {
-      name: "Conditional Trade Instrument Demo",
-      description: "Milestone-gated trade finance instrument for the TradeFlow Control Desk demo.",
-      category: "conditional-trade-instrument",
-      ...metadata
-    }
+    metadata: mintMetadata(metadata)
   };
+}
+
+function mintMetadata(metadata = {}) {
+  return {
+    name: "Conditional Trade Instrument Demo",
+    description: "Milestone-gated trade finance instrument for the TradeFlow Control Desk demo.",
+    category: "conditional-trade-instrument",
+    ...metadata
+  };
+}
+
+export async function executeEventBusWithFallback(client, attempts) {
+  const errors = [];
+  for (const attempt of attempts) {
+    try {
+      const result = await client.eventBus.execute(attempt.payload);
+      return { result, payloadStyle: attempt.style };
+    } catch (error) {
+      errors.push({
+        style: attempt.style,
+        status: error.status || null,
+        message: error.message,
+        body: error.body || null
+      });
+    }
+  }
+  const error = new Error(`DUAL event-bus write failed. ${errors.map((item) => `${item.style}: ${item.message}`).join(" | ")}`);
+  error.status = errors[0]?.status || 400;
+  error.body = { attempts: errors };
+  throw error;
 }
 
 export function semanticMetadata(eventType, properties, audit = {}) {

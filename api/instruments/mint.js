@@ -2,8 +2,9 @@ import {
   deriveProofHashes,
   dualConfig,
   dualClient,
+  executeEventBusWithFallback,
   extractResultObject,
-  mintPayload,
+  mintPayloadAttempts,
   normalizeInstrumentProperties,
   readBody,
   requireOperator,
@@ -35,14 +36,17 @@ export default async function handler(request, response) {
       settlement_hash: properties.settlement_hash || hashes.settlement_hash
     });
     const metadata = semanticMetadata("conditional_trade_instrument_minted", enriched, body.audit || {});
-    const payload = mintPayload(config.templateId, enriched, metadata);
-    const result = await (await dualClient(config)).eventBus.execute(payload);
+    const { result, payloadStyle } = await executeEventBusWithFallback(
+      await dualClient(config),
+      mintPayloadAttempts(config.templateId, enriched, metadata)
+    );
     const object = extractResultObject(result);
 
     response.status(200).json({
       minted: true,
       synced: true,
       action: "mint",
+      payloadStyle,
       publicWrites: false,
       object,
       result
