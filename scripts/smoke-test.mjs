@@ -133,8 +133,12 @@ const mcpTools = await mcp("tools/list", {});
 const mcpToolNames = mcpTools.tools.map((tool) => tool.name);
 assert(mcpToolNames.includes("tradeflow_dual_get_status"), "MCP tools include status read");
 assert(mcpToolNames.includes("tradeflow_dual_get_instrument"), "MCP tools include instrument read");
+assert(mcpToolNames.includes("tradeflow_dual_get_policy"), "MCP tools include policy discovery");
 assert(mcpToolNames.includes("tradeflow_dual_evaluate_gate"), "MCP tools include gate evaluator");
 assert(mcpToolNames.includes("tradeflow_dual_verify_proof"), "MCP tools include proof verifier");
+assert(mcpToolNames.includes("tradeflow_dual_get_mint_status"), "MCP tools include mint status read");
+assert(mcpToolNames.includes("tradeflow_dual_simulate_lifecycle"), "MCP tools include lifecycle simulator");
+assert(mcpToolNames.includes("tradeflow_dual_evaluate_adversarial_gate"), "MCP tools include adversarial gate evaluator");
 assert(mcpToolNames.includes("tradeflow_dual_red_team"), "MCP tools include red-team check");
 assert(mcpTools.tools.find((tool) => tool.name === "tradeflow_dual_prepare_sync_payload")?.["x-dual"]?.previewOnly === true, "MCP sync tool is preview-only");
 
@@ -151,6 +155,15 @@ const mcpInstrument = mcpJson(await mcp("tools/call", {
   arguments: {}
 }));
 assert(mcpInstrument.instrument.properties.instrument_id === "CTI-SG-AU-001", "MCP instrument tool returns seed instrument");
+assert(mcpInstrument.instrument.semantics.current_milestone.includes("Next milestone"), "MCP instrument documents current milestone semantics");
+
+const mcpPolicy = mcpJson(await mcp("tools/call", {
+  name: "tradeflow_dual_get_policy",
+  arguments: {}
+}));
+assert(mcpPolicy.policy.supported.corridors.includes("SG-AU"), "MCP policy lists supported corridor");
+assert(mcpPolicy.policy.supported.commodity_classes.includes("medical-devices"), "MCP policy lists supported commodity class");
+assert(mcpPolicy.policy.operatorGate.publicMcp.includes("previews only"), "MCP policy defines operator gate boundary");
 
 const mcpApproved = mcpJson(await mcp("tools/call", {
   name: "tradeflow_dual_evaluate_gate",
@@ -167,6 +180,8 @@ const mcpApproved = mcpJson(await mcp("tools/call", {
 }));
 assert(mcpApproved.evaluation.result === "Approved", "MCP evaluator approves in-scope gate");
 assert(mcpApproved.evaluation.proof.decision_hash, "MCP evaluator returns decision hash");
+assert(mcpApproved.evaluation.proof.event_hash, "MCP evaluator returns event hash");
+assert(Array.isArray(mcpApproved.evaluation.proof.evidence_refs), "MCP evaluator returns evidence refs");
 assert(mcpApproved.publicWrites === false, "MCP evaluator reports no public writes");
 
 const mcpProof = mcpJson(await mcp("tools/call", {
@@ -175,6 +190,12 @@ const mcpProof = mcpJson(await mcp("tools/call", {
 }));
 assert(mcpProof.proof.bundle_hash, "MCP proof tool returns bundle hash");
 assert(mcpProof.proof.object.public_writes === false, "MCP proof reports no public writes");
+assert(mcpProof.proof.instrument.properties.instrument_id === "CTI-SG-AU-001", "MCP proof uses canonical instrument envelope");
+const mcpProofAgain = mcpJson(await mcp("tools/call", {
+  name: "tradeflow_dual_get_proof",
+  arguments: {}
+}));
+assert(mcpProofAgain.proof.bundle_hash === mcpProof.proof.bundle_hash, "MCP proof bundle hash is stable across read calls");
 
 const mcpVerify = mcpJson(await mcp("tools/call", {
   name: "tradeflow_dual_verify_proof",
@@ -182,14 +203,65 @@ const mcpVerify = mcpJson(await mcp("tools/call", {
 }));
 assert(mcpVerify.verification.ok === true, "MCP proof verifier passes seed proof");
 assert(mcpVerify.verification.publicWrites === false, "MCP proof verifier reports no public writes");
+assert(mcpVerify.verification.checks.find((check) => check.name === "policy_hash_rederived")?.ok === true, "MCP proof verifier re-derives policy hash");
+assert(mcpVerify.verification.checks.find((check) => check.name === "event_hash_rederived")?.ok === true, "MCP proof verifier re-derives event hash");
 
 const mcpSyncPreview = mcpJson(await mcp("tools/call", {
   name: "tradeflow_dual_prepare_sync_payload",
-  arguments: {}
+  arguments: {
+    instrument: {
+      instrument_id: "CTI-SG-AU-001",
+      policy_hash: "policy-override",
+      instrument_hash: "instrument-override",
+      settlement_hash: "settlement-override",
+      last_event_hash: "event-override",
+      evidence_hash: "evidence-override"
+    }
+  }
 }));
 assert(mcpSyncPreview.executed === false, "MCP sync payload is not executed");
 assert(mcpSyncPreview.publicWrites === false, "MCP sync payload reports no public writes");
 assert(mcpSyncPreview.payload_preview?.action?.update, "MCP sync payload returns update preview");
+assert(mcpSyncPreview.payload_preview.action.update.data.custom.policy_hash === "policy-override", "MCP sync payload honours policy hash override");
+assert(mcpSyncPreview.payload_preview.action.update.data.custom.instrument_hash === "instrument-override", "MCP sync payload honours instrument hash override");
+assert(mcpSyncPreview.payload_preview.action.update.data.custom.settlement_hash === "settlement-override", "MCP sync payload honours settlement hash override");
+
+const mcpInvalidOverride = await mcp("tools/call", {
+  name: "tradeflow_dual_prepare_sync_payload",
+  arguments: { instrument: { made_up_field: "silently-drop-me" } }
+});
+assert(mcpInvalidOverride.isError === true, "MCP sync payload rejects unknown instrument fields");
+assert(mcpJson(mcpInvalidOverride).error.code === "invalid_instrument_fields", "MCP sync payload reports invalid instrument field code");
+
+const mcpMintStatus = mcpJson(await mcp("tools/call", {
+  name: "tradeflow_dual_get_mint_status",
+  arguments: {}
+}));
+assert(mcpMintStatus.publicWrites === false, "MCP mint status reports no public writes");
+
+const mcpSimulation = mcpJson(await mcp("tools/call", {
+  name: "tradeflow_dual_simulate_lifecycle",
+  arguments: {}
+}));
+assert(mcpSimulation.persisted === false, "MCP lifecycle simulation does not persist state");
+assert(mcpSimulation.steps.length === 4, "MCP lifecycle simulation runs default four milestones");
+assert(mcpSimulation.final_instrument.properties.released_usd === 148500, "MCP lifecycle simulation releases full seed value");
+
+const mcpAdversarial = mcpJson(await mcp("tools/call", {
+  name: "tradeflow_dual_evaluate_adversarial_gate",
+  arguments: {
+    expect: "Blocked",
+    gate: {
+      milestone_id: "loaded",
+      milestone_name: "Cargo loaded",
+      corridor: "NZ-AU",
+      commodity_class: "medical-devices",
+      release_usd: 29700,
+      evidence_attached: true
+    }
+  }
+}));
+assert(mcpAdversarial.matchedExpectation === true, "MCP adversarial evaluator matches expected block");
 
 const mcpRedTeam = mcpJson(await mcp("tools/call", {
   name: "tradeflow_dual_red_team",
@@ -200,6 +272,8 @@ assert(mcpRedTeam.evaluation.result === "Blocked", "MCP red-team returns blocked
 
 const mcpResources = await mcp("resources/list", {});
 assert(mcpResources.resources.some((resource) => resource.uri === "tradeflow://proof"), "MCP resources include proof");
+assert(mcpResources.resources.some((resource) => resource.uri === "tradeflow://policy"), "MCP resources include policy");
+assert(mcpResources.resources.some((resource) => resource.uri === "tradeflow://mint-status"), "MCP resources include mint status");
 assert(mcpResources.resources.some((resource) => resource.uri === "tradeflow://template"), "MCP resources include template");
 
 const mcpProofResource = await mcp("resources/read", { uri: "tradeflow://proof" });

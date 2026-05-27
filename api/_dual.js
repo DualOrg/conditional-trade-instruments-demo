@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 export const defaultOrgId = "69b935b4187e903f826bbe71";
 export const templateName = "io.dual.conditional_trade_instrument.demo.v1";
+export const seedUpdatedAt = "2026-05-27T00:00:00.000Z";
 
 export function dualConfig() {
   const mode = process.env.DUAL_PERSISTENCE_MODE || "local";
@@ -152,6 +153,7 @@ export function instrumentTemplateProperties() {
     policy_hash: "string",
     instrument_hash: "string",
     evidence_hash: "string",
+    evidence_refs: "array",
     last_event_hash: "string",
     settlement_hash: "string",
     last_decision_result: "string",
@@ -161,34 +163,20 @@ export function instrumentTemplateProperties() {
 }
 
 export function seedInstrumentProperties() {
-  const properties = normalizeInstrumentProperties({});
-  const policyHash = hashJson({
-    corridor: properties.corridor,
-    commodity_class: properties.commodity_class,
-    max_instrument_usd: properties.max_instrument_usd,
-    review_threshold_usd: properties.review_threshold_usd,
-    sanctions_clear: properties.sanctions_clear,
-    customs_preclearance: properties.customs_preclearance,
-    policy_version: properties.policy_version
-  });
-  const instrumentHash = hashJson({
-    instrument_id: properties.instrument_id,
-    buyer: properties.buyer,
-    supplier: properties.supplier,
-    corridor: properties.corridor,
-    commodity_class: properties.commodity_class,
-    value_usd: properties.value_usd
-  });
+  const properties = normalizeInstrumentProperties({ updated_at: seedUpdatedAt });
+  const hashes = deriveProofHashes(properties);
   return {
     ...properties,
-    policy_hash: policyHash,
-    instrument_hash: instrumentHash,
-    settlement_hash: hashJson({ instrument_id: properties.instrument_id, released_usd: properties.released_usd })
+    policy_hash: hashes.policy_hash,
+    instrument_hash: hashes.instrument_hash,
+    evidence_hash: hashes.evidence_hash,
+    last_event_hash: hashes.event_hash,
+    settlement_hash: hashes.settlement_hash
   };
 }
 
 export function normalizeInstrumentProperties(input = {}) {
-  const now = new Date().toISOString();
+  const updatedAt = input.updated_at === undefined ? seedUpdatedAt : input.updated_at;
   const value = numberValue(input.value_usd, 148500);
   const released = numberValue(input.released_usd, 0);
   return {
@@ -214,30 +202,149 @@ export function normalizeInstrumentProperties(input = {}) {
     policy_hash: stringValue(input.policy_hash),
     instrument_hash: stringValue(input.instrument_hash),
     evidence_hash: stringValue(input.evidence_hash),
+    evidence_refs: normalizeEvidenceRefs(input.evidence_refs),
     last_event_hash: stringValue(input.last_event_hash),
     settlement_hash: stringValue(input.settlement_hash),
     last_decision_result: stringValue(input.last_decision_result, "Ready"),
     last_decision_reason: stringValue(input.last_decision_reason, "Awaiting next verification"),
-    updated_at: stringValue(input.updated_at, now)
+    updated_at: stringValue(updatedAt, seedUpdatedAt)
   };
 }
 
 export function normalizeGateRequest(input = {}) {
+  const evidenceRefs = normalizeEvidenceRefs(input.evidence_refs, []);
   return {
     milestone_id: stringValue(input.milestone_id, "loaded"),
     milestone_name: stringValue(input.milestone_name, "Cargo loaded"),
     corridor: stringValue(input.corridor, "SG-AU"),
     commodity_class: stringValue(input.commodity_class, "medical-devices"),
     release_usd: numberValue(input.release_usd, 29700),
-    evidence_attached: booleanValue(input.evidence_attached, true),
+    evidence_attached: evidenceRefs.length ? true : booleanValue(input.evidence_attached, true),
     evidence_type: stringValue(input.evidence_type, "BOL + GPS fix"),
+    evidence_refs: evidenceRefs,
     customs_preclearance: booleanValue(input.customs_preclearance, true)
+  };
+}
+
+export function defaultEvidenceRefs() {
+  return [
+    {
+      type: "bill_of_lading",
+      id: "BOL-8842",
+      hash: hashJson({ type: "bill_of_lading", id: "BOL-8842", issuer: "Lion City Precision" }),
+      issuer: "Lion City Precision",
+      uri: "demo://evidence/bol-8842"
+    },
+    {
+      type: "gps_fix",
+      id: "GPS-SIN-SYD-20260527",
+      hash: hashJson({ type: "gps_fix", id: "GPS-SIN-SYD-20260527", corridor: "SG-AU" }),
+      issuer: "TradeFlow route oracle",
+      uri: "demo://evidence/gps-sin-syd-20260527"
+    }
+  ];
+}
+
+export function normalizeEvidenceRefs(input = undefined, fallback = defaultEvidenceRefs()) {
+  const source = Array.isArray(input) ? input : fallback;
+  return source
+    .filter((item) => item && typeof item === "object")
+    .map((item) => {
+      const base = {
+        type: stringValue(item.type, "attestation"),
+        id: stringValue(item.id || item.cid || item.attestation_id),
+        hash: stringValue(item.hash),
+        issuer: stringValue(item.issuer),
+        uri: stringValue(item.uri)
+      };
+      return {
+        ...base,
+        hash: base.hash || hashJson({
+          type: base.type,
+          id: base.id,
+          issuer: base.issuer,
+          uri: base.uri
+        })
+      };
+    })
+    .filter((item) => item.id || item.hash || item.uri);
+}
+
+export function deriveProofHashes(properties, options = {}) {
+  const instrument = normalizeInstrumentProperties(properties);
+  const gate = options.gate ? normalizeGateRequest(options.gate) : null;
+  const evidenceRefs = normalizeEvidenceRefs(
+    options.evidence_refs !== undefined ? options.evidence_refs : instrument.evidence_refs,
+    []
+  );
+  const evidenceHash = evidenceRefs.length
+    ? hashJson(evidenceRefs)
+    : hashJson({
+        instrument_id: instrument.instrument_id,
+        current_milestone: instrument.current_milestone,
+        evidence_attached: Boolean(gate?.evidence_attached),
+        evidence_type: gate?.evidence_type || ""
+      });
+  const policyHash = hashJson({
+    corridor: instrument.corridor,
+    commodity_class: instrument.commodity_class,
+    max_instrument_usd: instrument.max_instrument_usd,
+    review_threshold_usd: instrument.review_threshold_usd,
+    sanctions_clear: instrument.sanctions_clear,
+    customs_preclearance: instrument.customs_preclearance,
+    policy_version: instrument.policy_version
+  });
+  const instrumentHash = hashJson({
+    instrument_id: instrument.instrument_id,
+    buyer: instrument.buyer,
+    supplier: instrument.supplier,
+    corridor: instrument.corridor,
+    commodity_class: instrument.commodity_class,
+    payment_rail: instrument.payment_rail,
+    value_usd: instrument.value_usd,
+    max_instrument_usd: instrument.max_instrument_usd
+  });
+  const settlementHash = hashJson({
+    instrument_id: instrument.instrument_id,
+    released_usd: instrument.released_usd,
+    remaining_usd: instrument.remaining_usd,
+    state: instrument.state
+  });
+  const eventHash = hashJson({
+    instrument_id: instrument.instrument_id,
+    current_milestone: instrument.current_milestone,
+    last_decision_result: instrument.last_decision_result,
+    last_decision_reason: instrument.last_decision_reason,
+    gate: gate ? {
+      milestone_id: gate.milestone_id,
+      milestone_name: gate.milestone_name,
+      release_usd: gate.release_usd,
+      evidence_hash: evidenceHash
+    } : null,
+    policy_hash: policyHash,
+    instrument_hash: instrumentHash,
+    settlement_hash: settlementHash
+  });
+  return {
+    policy_hash: policyHash,
+    instrument_hash: instrumentHash,
+    evidence_hash: evidenceHash,
+    event_hash: eventHash,
+    settlement_hash: settlementHash
   };
 }
 
 export function evaluateInstrumentGate(properties, request, context = {}) {
   const instrument = normalizeInstrumentProperties(properties);
   const gate = normalizeGateRequest(request);
+  const derivedHashes = deriveProofHashes(instrument, { gate, evidence_refs: gate.evidence_refs.length ? gate.evidence_refs : instrument.evidence_refs });
+  const proofHashes = {
+    policy_hash: instrument.policy_hash || derivedHashes.policy_hash,
+    instrument_hash: instrument.instrument_hash || derivedHashes.instrument_hash,
+    evidence_hash: gate.evidence_refs.length ? derivedHashes.evidence_hash : (instrument.evidence_hash || derivedHashes.evidence_hash),
+    event_hash: derivedHashes.event_hash,
+    settlement_hash: instrument.settlement_hash || derivedHashes.settlement_hash
+  };
   const reasons = [];
   let code = "approved";
   let result = "Approved";
@@ -299,9 +406,11 @@ export function evaluateInstrumentGate(properties, request, context = {}) {
     gate,
     result,
     code,
-    policy_hash: instrument.policy_hash,
-    instrument_hash: instrument.instrument_hash,
-    last_event_hash: instrument.last_event_hash
+    policy_hash: proofHashes.policy_hash,
+    instrument_hash: proofHashes.instrument_hash,
+    evidence_hash: proofHashes.evidence_hash,
+    event_hash: proofHashes.event_hash,
+    settlement_hash: proofHashes.settlement_hash
   });
 
   return {
@@ -324,11 +433,14 @@ export function evaluateInstrumentGate(properties, request, context = {}) {
       template_id: context.object?.templateId || null,
       state_hash: context.object?.stateHash || null,
       integrity_hash: context.object?.integrityHash || null,
-      policy_hash: instrument.policy_hash,
-      instrument_hash: instrument.instrument_hash,
-      evidence_hash: instrument.evidence_hash,
-      settlement_hash: instrument.settlement_hash,
+      policy_hash: proofHashes.policy_hash,
+      instrument_hash: proofHashes.instrument_hash,
+      evidence_hash: proofHashes.evidence_hash,
+      event_hash: proofHashes.event_hash,
+      settlement_hash: proofHashes.settlement_hash,
       decision_hash: decisionHash,
+      evidence_refs: gate.evidence_refs.length ? gate.evidence_refs : instrument.evidence_refs,
+      derived_hashes: derivedHashes,
       evaluated_at: new Date().toISOString()
     }
   };

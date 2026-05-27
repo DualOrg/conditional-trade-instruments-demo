@@ -25,6 +25,7 @@
     "policy_hash": "string",
     "instrument_hash": "string",
     "evidence_hash": "string",
+    "evidence_refs": "array",
     "last_event_hash": "string",
     "settlement_hash": "string",
     "last_decision_result": "string",
