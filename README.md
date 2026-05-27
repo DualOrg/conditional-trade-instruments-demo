@@ -8,6 +8,12 @@ Production demo:
 https://conditional-trade-instruments.vercel.app
 ```
 
+Prepared demo entry:
+
+```text
+https://conditional-trade-instruments.vercel.app/?demo=operator-cargo
+```
+
 Open:
 
 ```text
@@ -37,6 +43,8 @@ The app demonstrates:
 - token object fields, proof hashes, settlement hash, and audit log;
 - local proof export state.
 
+The prepared demo entry opens with Cargo loaded verified, USD 29,700 released, Customs cleared as the next gate, and the live DUAL proof rail visible. See `docs/tradeflow-demo-runbook.md`.
+
 ## API Surface
 
 Safe read/evaluate endpoints:
@@ -46,12 +54,12 @@ Safe read/evaluate endpoints:
 - `GET /api/instruments/current`
 - `POST /api/instruments/evaluate`
 
-Operator-gated scaffold endpoints:
+Operator-gated live endpoints:
 
 - `POST /api/instruments/sync`
 - `POST /api/instruments/mint`
 
-The scaffold rejects public writes. Live DUAL write execution is intentionally disabled until the template/object IDs and write phase are explicitly approved.
+The public app rejects public writes. Live DUAL write execution is available only through the operator-gated REST endpoints when the deployment has DUAL read/write configuration, `DUAL_WRITE_MODE=event_bus`, and `DEMO_OPERATOR_TOKEN`.
 
 ## MCP Quick Start
 
@@ -154,3 +162,13 @@ npm run smoke
 ```
 
 This is a local-first prototype. It does not write to live DUAL objects by default.
+
+## Create the Live Demo Entry
+
+With the production operator environment loaded:
+
+```text
+npm run demo:entry
+```
+
+This syncs the canonical Cargo loaded demo entry into the configured DUAL object and reads the proof bundle back. The command prints object/template ids and proof hashes only; it does not print secrets.

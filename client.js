@@ -168,6 +168,9 @@ function clone(value) {
 }
 
 function loadState() {
+  const demoEntry = demoEntryState(requestedDemoEntry());
+  if (demoEntry) return demoEntry;
+
   const stored = localStorage.getItem("dual-tradeflow-state");
   if (!stored) return clone(initialState);
   try {
@@ -190,6 +193,62 @@ function loadState() {
   } catch {
     return clone(initialState);
   }
+}
+
+function requestedDemoEntry() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return (params.get("demo") || "").trim().toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+function demoEntryState(name) {
+  if (!["operator-cargo", "cargo-verified"].includes(name)) return null;
+
+  const demo = clone(initialState);
+  demo.selectedTab = "mutable";
+  demo.selectedView = "timeline";
+  demo.nonce = 7;
+  demo.exported = true;
+  demo.instrument.corridor = "SG-AU";
+  demo.instrument.commodity = "medical-devices";
+  demo.instrument.valueUsd = 148500;
+  demo.instrument.paymentRail = "bank-escrow";
+  demo.milestones = demo.milestones.map((milestone) => {
+    if (milestone.id === "loaded") return { ...milestone, status: "verified", evidenceAttached: true };
+    if (milestone.id === "customs") return { ...milestone, status: "active", evidenceAttached: false };
+    return milestone;
+  });
+  demo.lastDecision = {
+    result: "Proof exported",
+    reason: "Cargo loaded gate verified; proof bundle ready for DUAL readback and explorer review",
+    evidence: "BOL-8842 + GPS fix -> $29,700 release",
+    tone: "ready"
+  };
+  demo.audit = [
+    {
+      type: "export",
+      title: "Demo proof bundle generated",
+      detail: "Cargo loaded verification exported for DUAL readback and block explorer review.",
+      at: "20:32:18"
+    },
+    {
+      type: "ok",
+      title: "Cargo loaded verified",
+      detail: "$29,700 released through bank escrow mirror.",
+      at: "20:31:57"
+    },
+    {
+      type: "ok",
+      title: "Evidence packet attached",
+      detail: "BOL-8842 + GPS fix attached for Cargo loaded.",
+      at: "20:31:34"
+    },
+    ...demo.audit
+  ];
+  return demo;
 }
 
 function saveState() {
