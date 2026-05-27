@@ -1,0 +1,23 @@
+{
+  "name": "dual-conditional-trade-instruments",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "DUAL Conditional Trade Instruments demo",
+  "scripts": {
+    "start": "node server.mjs",
+    "check": "node --check app.js && node --check server.mjs && node --check api/_dual.js && node --check api/dual/status.js && node --check api/instruments/current.js && node --check api/instruments/evaluate.js && node --check api/instruments/sync.js && node --check api/instruments/mint.js && node --check scripts/smoke-test.mjs",
+    "smoke": "node scripts/smoke-test.mjs"
+  },
+  "dependencies": {},
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DualOrg/conditional-trade-instruments-demo.git"
+  },
+  "homepage": "https://conditional-trade-instruments-demo.vercel.app",
+  "bugs": {
+    "url": "https://github.com/DualOrg/conditional-trade-instruments-demo/issues"
+  },
+  "license": "UNLICENSED"
+}

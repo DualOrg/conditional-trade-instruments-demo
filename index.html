@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TradeFlow Control Desk</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <nav class="nav-rail" aria-label="TradeFlow sections">
+      <button class="rail-button active" type="button" aria-label="Overview">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h6v6H4z" /><path d="M14 5h6v6h-6z" /><path d="M4 15h6v4H4z" /><path d="M14 15h6v4h-6z" /></svg>
+      </button>
+      <button class="rail-button" type="button" aria-label="Milestones">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 18h14" /><path d="M7 18V9l5-3 5 3v9" /><path d="M10 18v-5h4v5" /></svg>
+      </button>
+      <button class="rail-button" type="button" aria-label="Evidence">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v14H7z" /><path d="M14 3v5h5" /><path d="M9.5 13h5" /><path d="M9.5 17h5" /></svg>
+      </button>
+      <button class="rail-button" type="button" aria-label="Payments">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16" /><path d="M17 7.5c-.8-1-2.1-1.5-3.8-1.5-2.1 0-3.7 1-3.7 2.7 0 3.8 7.7 1.7 7.7 6 0 1.8-1.7 3.3-4.2 3.3-1.9 0-3.4-.6-4.5-1.8" /></svg>
+      </button>
+      <button class="rail-button" type="button" aria-label="Proof">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 7v5c0 4.6-3.2 7.6-8 9-4.8-1.4-8-4.4-8-9V7z" /><path d="M8.5 12.5 11 15l4.5-5" /></svg>
+      </button>
+    </nav>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-block">
+          <div class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 28 28">
+              <path d="M6.7 5.5h8.8c3.2 0 5.8 2.6 5.8 5.8v5.4c0 3.2-2.6 5.8-5.8 5.8H6.7v-17Z" />
+              <path d="M11 10h4.2c1.4 0 2.6 1.2 2.6 2.6v2.8c0 1.4-1.2 2.6-2.6 2.6H11v-8Z" />
+            </svg>
+          </div>
+          <strong class="wordmark">DUAL</strong>
+          <div>
+            <h1>TradeFlow Control Desk</h1>
+            <p>Conditional trade instruments with mandate-gated settlement proof.</p>
+          </div>
+        </div>
+        <div class="header-meta">
+          <span>Corridor: Singapore (SGP) -> Australia (AUS)</span>
+          <span>Instrument: DUAL-TFI-2025-00017</span>
+          <span class="agent-chip">Buyer agent authorized</span>
+        </div>
+        <div class="topbar-actions">
+          <button class="icon-btn" id="resetBtn" title="Reset demo state" aria-label="Reset demo state">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 7.2V3.9h3.3" /><path d="M5 7.1A8.2 8.2 0 1 1 3.8 14" /></svg>
+          </button>
+          <button class="secondary-btn" id="exportBtn">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11" /><path d="m8 11 4 4 4-4" /><path d="M5 20h14" /></svg>
+            Generate proof bundle
+          </button>
+          <button class="primary-btn" id="verifyBtn">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 9.4 17 19 7" /></svg>
+            Verify next gate
+          </button>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <aside class="panel left-panel">
+          <section class="panel-section">
+            <div class="section-head">
+              <h2>Corridor</h2>
+              <span class="status-chip" id="corridorStatus">Allowed</span>
+            </div>
+            <div class="route-card">
+              <div>
+                <span>Supplier</span>
+                <strong>Lion City Precision</strong>
+                <small>Singapore bonded warehouse</small>
+              </div>
+              <div class="route-line" aria-hidden="true"></div>
+              <div>
+                <span>Buyer</span>
+                <strong>AUS MedTech Pty Ltd</strong>
+                <small>Sydney distribution centre</small>
+              </div>
+            </div>
+            <label class="field">
+              <span>Trade corridor</span>
+              <select id="corridorSelect">
+                <option value="SG-AU">Singapore to Australia</option>
+                <option value="SG-US">Singapore to United States</option>
+                <option value="CN-AU">China to Australia</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Commodity class</span>
+              <select id="commoditySelect">
+                <option value="medical-devices">Medical devices</option>
+                <option value="lithium-cells">Lithium cells</option>
+                <option value="luxury-goods">Luxury goods</option>
+              </select>
+            </label>
+          </section>
+
+          <section class="panel-section">
+            <div class="section-head">
+              <h2>Buyer Mandate</h2>
+              <span class="small-metric" id="policyVersion">policy v1</span>
+            </div>
+            <label class="field">
+              <span>Buyer agent</span>
+              <input id="buyerAgent" type="text" autocomplete="off" />
+            </label>
+            <label class="field">
+              <span>Max instrument USD</span>
+              <input id="maxInstrumentUsd" type="number" min="1" step="5000" />
+            </label>
+            <label class="field">
+              <span>Manual review threshold</span>
+              <input id="reviewThreshold" type="number" min="1" step="5000" />
+            </label>
+            <label class="toggle-row">
+              <input id="sanctionsClear" type="checkbox" checked />
+              <span>Counterparties sanctions clear</span>
+            </label>
+            <label class="toggle-row">
+              <input id="customsPreclearance" type="checkbox" checked />
+              <span>Customs pre-clearance present</span>
+            </label>
+            <button class="secondary-btn full-width" id="savePolicyBtn">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 9.4 17 19 7" /></svg>
+              Save mandate boundary
+            </button>
+          </section>
+
+          <section class="panel-section">
+            <div class="section-head">
+              <h2>Instrument Controls</h2>
+            </div>
+            <label class="field">
+              <span>Instrument value USD</span>
+              <input id="instrumentValue" type="number" min="1" step="5000" />
+            </label>
+            <label class="field">
+              <span>Payment rail</span>
+              <select id="paymentRail">
+                <option value="bank-escrow">Bank escrow mirror</option>
+                <option value="stablecoin-escrow">Stablecoin escrow</option>
+                <option value="erp-payable">ERP payable trigger</option>
+              </select>
+            </label>
+            <div class="button-grid">
+              <button class="secondary-btn" id="attachEvidenceBtn">Attach evidence</button>
+              <button class="danger-btn" id="forceBreachBtn">Force breach</button>
+            </div>
+          </section>
+        </aside>
+
+        <section class="center-stack">
+          <section class="panel instrument-panel">
+            <div class="instrument-header">
+              <div>
+                <h2>Conditional Trade Instrument</h2>
+                <p id="instrumentSubtitle">Milestone-gated letter of credit for shipment CTI-SG-AU-001.</p>
+              </div>
+              <div class="instrument-state">
+                <span id="instrumentState">Issued</span>
+                <strong id="proofScore">96</strong>
+                <small>proof score</small>
+              </div>
+            </div>
+            <div class="metric-grid">
+              <div class="metric">
+                <span>Instrument ID</span>
+                <strong>CTI-SG-AU-001</strong>
+              </div>
+              <div class="metric">
+                <span>Face value</span>
+                <strong id="faceValue">$148,500</strong>
+              </div>
+              <div class="metric">
+                <span>Released</span>
+                <strong id="releasedValue">$0</strong>
+              </div>
+              <div class="metric">
+                <span>Next gate</span>
+                <strong id="nextGate">Cargo loaded</strong>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel route-panel">
+            <div class="section-head">
+              <h2>Shipment Route</h2>
+              <div class="segmented" role="group" aria-label="Route view">
+                <button class="segment active" data-view="timeline">Timeline</button>
+                <button class="segment" data-view="evidence">Evidence</button>
+                <button class="segment" data-view="payments">Payments</button>
+              </div>
+            </div>
+            <div class="route-map" id="routeMap" aria-label="Shipment route timeline"></div>
+          </section>
+
+          <section class="panel milestone-panel">
+            <div class="section-head">
+              <h2>Milestone Gates</h2>
+              <span class="small-metric" id="milestoneCount">2 of 6 verified</span>
+            </div>
+            <div class="milestone-grid" id="milestoneGrid"></div>
+          </section>
+
+          <section class="lower-grid">
+            <section class="panel decision-panel">
+              <div class="section-head">
+                <h2>Verification Queue</h2>
+                <span class="status-chip" id="decisionTone">Ready</span>
+              </div>
+              <div class="decision-strip" id="decisionStrip">
+                <div>
+                  <span class="label">Policy result</span>
+                  <strong id="policyResult">Ready</strong>
+                </div>
+                <div>
+                  <span class="label">Reason</span>
+                  <strong id="policyReason">Awaiting next verification</strong>
+                </div>
+                <div>
+                  <span class="label">Evidence packet</span>
+                  <strong id="evidencePacket">BOL + GPS + inspection</strong>
+                </div>
+              </div>
+              <div class="evidence-table" id="evidenceTable"></div>
+            </section>
+
+            <section class="panel payment-panel">
+              <div class="section-head">
+                <h2>Payment Releases</h2>
+                <span class="small-metric" id="paymentRailLabel">bank escrow mirror</span>
+              </div>
+              <div class="payment-list" id="paymentList"></div>
+            </section>
+          </section>
+        </section>
+
+        <aside class="panel right-panel">
+          <section class="panel-section">
+            <div class="section-head">
+              <h2>DUAL Token Object</h2>
+              <span class="small-metric" id="nonceLabel">nonce 1</span>
+            </div>
+            <div class="schema-tabs" role="tablist" aria-label="Token object fields">
+              <button class="schema-tab active" data-tab="instrument">Instrument</button>
+              <button class="schema-tab" data-tab="mutable">Mutable</button>
+              <button class="schema-tab" data-tab="compliance">Compliance</button>
+            </div>
+            <pre class="code-panel" id="schemaPanel"></pre>
+          </section>
+
+          <section class="panel-section">
+            <div class="section-head">
+              <h2>Proof Rail</h2>
+              <span class="status-chip verified">Live</span>
+            </div>
+            <div class="proof-list">
+              <div><span>Instrument hash</span><code id="instrumentHash">pending</code></div>
+              <div><span>Policy hash</span><code id="policyHash">pending</code></div>
+              <div><span>Last event hash</span><code id="eventHash">pending</code></div>
+              <div><span>Settlement proof</span><code id="settlementHash">pending</code></div>
+            </div>
+          </section>
+
+          <section class="panel-section audit-section">
+            <div class="section-head">
+              <h2>Audit Log</h2>
+              <span class="small-metric" id="auditCount">4 events</span>
+            </div>
+            <div class="audit-log" id="auditLog"></div>
+          </section>
+        </aside>
+      </main>
+
+      <footer class="settlement-bar">
+        <div>
+          <span>State machine</span>
+          <strong id="stateMachine">Issued -> Milestone pending -> Payment released -> Settled</strong>
+        </div>
+        <div>
+          <span>Blocked actions</span>
+          <strong id="blockedCount">0</strong>
+        </div>
+        <div>
+          <span>Remaining exposure</span>
+          <strong id="remainingExposure">$148,500</strong>
+        </div>
+        <div>
+          <span>Export status</span>
+          <strong id="exportStatus">Not exported</strong>
+        </div>
+      </footer>
+    </div>
+    <script src="./app.js"></script>
+  </body>
+</html>
