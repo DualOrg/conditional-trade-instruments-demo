@@ -268,9 +268,9 @@ const mcpSyncPreview = mcpJson(await mcp("tools/call", {
 assert(mcpSyncPreview.executed === false, "MCP sync payload is not executed");
 assert(mcpSyncPreview.publicWrites === false, "MCP sync payload reports no public writes");
 assert(mcpSyncPreview.payload_preview?.action?.update, "MCP sync payload returns update preview");
-assert(mcpSyncPreview.payload_preview.action.update.data.custom.policy_hash === "policy-override", "MCP sync payload honours policy hash override");
-assert(mcpSyncPreview.payload_preview.action.update.data.custom.instrument_hash === "instrument-override", "MCP sync payload honours instrument hash override");
-assert(mcpSyncPreview.payload_preview.action.update.data.custom.settlement_hash === "settlement-override", "MCP sync payload honours settlement hash override");
+assert(mcpSyncPreview.payload_preview.action.update.custom.policy_hash === "policy-override", "MCP sync payload honours policy hash override");
+assert(mcpSyncPreview.payload_preview.action.update.custom.instrument_hash === "instrument-override", "MCP sync payload honours instrument hash override");
+assert(mcpSyncPreview.payload_preview.action.update.custom.settlement_hash === "settlement-override", "MCP sync payload honours settlement hash override");
 
 const mcpInvalidOverride = await mcp("tools/call", {
   name: "tradeflow_dual_prepare_sync_payload",

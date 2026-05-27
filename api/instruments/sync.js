@@ -1,9 +1,13 @@
 import {
+  deriveProofHashes,
   dualConfig,
+  dualClient,
+  extractResultObject,
   normalizeInstrumentProperties,
   readBody,
   requireOperator,
   requireWritable,
+  semanticMetadata,
   sendError,
   updatePayload
 } from "../_dual.js";
@@ -20,15 +24,31 @@ export default async function handler(request, response) {
     const body = await readBody(request);
     const config = dualConfig();
     const properties = normalizeInstrumentProperties(body.properties || body.instrument || body);
-    const payload = updatePayload(config.objectId, properties, {
-      event_hash: properties.last_event_hash || properties.settlement_hash
+    const hashes = deriveProofHashes(properties);
+    const enriched = normalizeInstrumentProperties({
+      ...properties,
+      policy_hash: properties.policy_hash || hashes.policy_hash,
+      instrument_hash: properties.instrument_hash || hashes.instrument_hash,
+      evidence_hash: properties.evidence_hash || hashes.evidence_hash,
+      last_event_hash: properties.last_event_hash || hashes.event_hash,
+      settlement_hash: properties.settlement_hash || hashes.settlement_hash
     });
+    const metadata = semanticMetadata("conditional_trade_instrument_synced", enriched, body.audit || body.gate || {});
+    const payload = updatePayload(config.objectId, enriched, metadata);
+    const result = await (await dualClient(config)).eventBus.execute(payload);
+    const object = extractResultObject(result) || {
+      id: config.objectId,
+      templateId: config.templateId,
+      organizationId: config.orgId,
+      properties: enriched
+    };
 
-    response.status(501).json({
-      synced: false,
+    response.status(200).json({
+      synced: true,
+      action: "update",
       publicWrites: false,
-      reason: "Operator gate passed, but live DUAL update execution is intentionally disabled in this scaffold until template/object IDs are approved for this demo.",
-      payload_preview: payload
+      object,
+      result
     });
   } catch (error) {
     sendError(response, error);

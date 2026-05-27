@@ -1,11 +1,15 @@
 import {
+  deriveProofHashes,
   dualConfig,
+  dualClient,
+  extractResultObject,
   mintPayload,
   normalizeInstrumentProperties,
   readBody,
   requireOperator,
   requireWritable,
   seedInstrumentProperties,
+  semanticMetadata,
   sendError
 } from "../_dual.js";
 
@@ -21,13 +25,27 @@ export default async function handler(request, response) {
     const body = await readBody(request);
     const config = dualConfig();
     const properties = normalizeInstrumentProperties(body.properties || body.instrument || seedInstrumentProperties());
-    const payload = mintPayload(config.templateId, properties);
+    const hashes = deriveProofHashes(properties);
+    const enriched = normalizeInstrumentProperties({
+      ...properties,
+      policy_hash: properties.policy_hash || hashes.policy_hash,
+      instrument_hash: properties.instrument_hash || hashes.instrument_hash,
+      evidence_hash: properties.evidence_hash || hashes.evidence_hash,
+      last_event_hash: properties.last_event_hash || hashes.event_hash,
+      settlement_hash: properties.settlement_hash || hashes.settlement_hash
+    });
+    const metadata = semanticMetadata("conditional_trade_instrument_minted", enriched, body.audit || {});
+    const payload = mintPayload(config.templateId, enriched, metadata);
+    const result = await (await dualClient(config)).eventBus.execute(payload);
+    const object = extractResultObject(result);
 
-    response.status(501).json({
-      minted: false,
+    response.status(200).json({
+      minted: true,
+      synced: true,
+      action: "mint",
       publicWrites: false,
-      reason: "Operator gate passed, but live DUAL mint execution is intentionally disabled in this scaffold until this demo receives explicit live-write approval.",
-      payload_preview: payload
+      object,
+      result
     });
   } catch (error) {
     sendError(response, error);

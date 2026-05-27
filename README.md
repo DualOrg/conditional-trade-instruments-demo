@@ -108,7 +108,7 @@ Available MCP resources:
 - `tradeflow://template`
 - `tradeflow://safety`
 
-The sync and mint tools are preview-only on the public MCP surface. They return DUAL event-bus payload previews but do not execute writes. "Operator-gated" means the REST sync/mint endpoints require `DEMO_OPERATOR_TOKEN`, DUAL read/write environment values, `DUAL_WRITE_MODE=event_bus`, and explicit live-write approval.
+The sync and mint tools are preview-only on the public MCP surface. They return DUAL event-bus payload previews but do not execute writes. "Operator-gated" means the REST sync/mint endpoints execute live DUAL event-bus writes only when `DEMO_OPERATOR_TOKEN`, DUAL read/write environment values, `DUAL_WRITE_MODE=event_bus`, and explicit live-write approval are all present.
 
 Tool `ok: true` means the MCP call succeeded. The trade decision lives in `evaluation.result`, `evaluation.allowed`, or `blockedOrEscalated` for red-team tools.
 

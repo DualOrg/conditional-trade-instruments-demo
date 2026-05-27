@@ -53,16 +53,62 @@ export function readiness() {
 
 export async function readCurrentObject() {
   const config = dualConfig();
-  const object = await dualRequest(config, "GET", `/objects/${encodeURIComponent(config.objectId)}`);
-  const properties = normalizeInstrumentProperties(
-    object?.properties || object?.custom || object?.data?.custom || object?.state?.custom || {}
-  );
+  const client = await dualClient(config);
+  const object = await client.objects.get(config.objectId);
+  const properties = normalizeInstrumentProperties(extractCustom(object));
   return {
     available: true,
-    object,
+    object: summarizeObject(object),
     properties,
     status: readiness()
   };
+}
+
+export async function dualClient(config = dualConfig()) {
+  return {
+    objects: {
+      get: (objectId) => dualRequest(config, "GET", `/objects/${encodeURIComponent(objectId)}`)
+    },
+    eventBus: {
+      execute: (payload) => dualRequest(config, "POST", "/ebus/execute", payload)
+    }
+  };
+}
+
+export function extractCustom(object = {}) {
+  return object?.properties
+    || object?.custom
+    || object?.data?.custom
+    || object?.state?.custom
+    || object?.object?.properties
+    || object?.object?.custom
+    || {};
+}
+
+export function summarizeObject(object = {}) {
+  if (!object || typeof object !== "object") return null;
+  return {
+    id: stringValue(object.id || object.object_id || object.objectId),
+    templateId: stringValue(object.template_id || object.templateId || object.template?.id),
+    organizationId: stringValue(object.organization_id || object.organizationId || object.org_id),
+    stateHash: stringValue(object.state_hash || object.stateHash),
+    integrityHash: stringValue(object.integrity_hash || object.integrityHash),
+    properties: normalizeInstrumentProperties(extractCustom(object))
+  };
+}
+
+export function extractResultObject(result = {}) {
+  const candidates = [
+    result?.object,
+    result?.data?.object,
+    result?.result?.object,
+    result?.objects?.[0],
+    result?.data?.objects?.[0],
+    result?.result?.objects?.[0],
+    result?.affected_objects?.[0],
+    result?.affectedObjects?.[0]
+  ];
+  return candidates.map((candidate) => summarizeObject(candidate)).find(Boolean) || null;
 }
 
 async function dualRequest(config, method, path, body) {
@@ -488,35 +534,55 @@ export function evaluateInstrumentGate(properties, request, context = {}) {
 }
 
 export function updatePayload(objectId, properties, metadata = {}) {
+  const custom = {
+    ...properties,
+    last_event_hash: metadata.event_hash || properties.last_event_hash || "",
+    updated_at: new Date().toISOString()
+  };
   return {
     action: {
       update: {
         id: objectId,
-        data: {
-          custom: {
-            ...properties,
-            last_event_hash: metadata.event_hash || properties.last_event_hash || "",
-            updated_at: new Date().toISOString()
-          }
-        }
+        custom
       }
-    }
+    },
+    metadata
   };
 }
 
-export function mintPayload(templateId, properties) {
+export function mintPayload(templateId, properties, metadata = {}) {
   return {
     action: {
       mint: {
         template_id: templateId,
-        data: {
-          name: "Conditional Trade Instrument Demo",
-          description: "Milestone-gated trade finance instrument for the TradeFlow Control Desk demo.",
-          category: "conditional-trade-instrument",
-          custom: properties
+        num: 1,
+        custom: {
+          ...properties,
+          updated_at: new Date().toISOString()
         }
       }
+    },
+    metadata: {
+      name: "Conditional Trade Instrument Demo",
+      description: "Milestone-gated trade finance instrument for the TradeFlow Control Desk demo.",
+      category: "conditional-trade-instrument",
+      ...metadata
     }
+  };
+}
+
+export function semanticMetadata(eventType, properties, audit = {}) {
+  return {
+    source: "tradeflow_conditional_trade_demo",
+    event_type: eventType,
+    event_status: properties.state,
+    event_hash: properties.last_event_hash || properties.settlement_hash || "",
+    instrument_id: properties.instrument_id,
+    current_milestone: properties.current_milestone,
+    released_usd: properties.released_usd,
+    remaining_usd: properties.remaining_usd,
+    generated_at: new Date().toISOString(),
+    audit
   };
 }
 
