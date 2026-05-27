@@ -78,6 +78,7 @@ const instrumentInputSchema = {
     released_usd: { type: "number" },
     remaining_usd: { type: "number" },
     blocked_actions: { type: "number" },
+    halt_reason: { type: "string" },
     policy_version: { type: "number" },
     policy_hash: { type: "string" },
     instrument_hash: { type: "string" },
@@ -185,6 +186,12 @@ const mcpTools = [
       instrument: instrumentInputSchema,
       gates: { type: "array", items: gateInputSchema },
       halt_on_block: { type: "boolean", default: true },
+      steps_view: {
+        type: "string",
+        enum: ["summary", "evaluation", "full"],
+        default: "summary",
+        description: "summary returns one compact row per step; evaluation returns the previous step envelope; full returns summary steps plus full_steps diagnostics."
+      },
       view: viewInputSchema
     }
   }, { annotations: { readOnlyHint: true }, "x-dual": { requiresAuthentication: false, publicWrites: false, persisted: false } }),
@@ -462,7 +469,7 @@ async function callMcpTool(_request, name, args) {
       validateTopLevelArgs(args, [], name);
       return getMintStatus();
     case "tradeflow_dual_simulate_lifecycle":
-      validateTopLevelArgs(args, ["instrument", "gates", "halt_on_block", "view"], name);
+      validateTopLevelArgs(args, ["instrument", "gates", "halt_on_block", "steps_view", "view"], name);
       return simulateLifecycle(args);
     case "tradeflow_dual_evaluate_adversarial_gate":
       validateTopLevelArgs(args, ["instrument", "gate", "expect", "view"], name);
@@ -746,6 +753,15 @@ function viewMode(args = {}, fallback = "compact") {
   });
 }
 
+function stepsViewMode(args = {}, view = "compact") {
+  const mode = args.steps_view || (view === "compact" ? "summary" : "evaluation");
+  if (["summary", "evaluation", "full"].includes(mode)) return mode;
+  throw Object.assign(new Error(`steps_view must be "summary", "evaluation", or "full", got "${mode}".`), {
+    status: 400,
+    code: "invalid_steps_view"
+  });
+}
+
 function declaredHashes(properties) {
   return {
     policy_hash: properties.policy_hash || "",
@@ -820,6 +836,21 @@ function compactProof(proof) {
     bundle_hash: proof.bundle_hash,
     caveats: proof.caveats,
     full_resource: "tradeflow://proof"
+  };
+}
+
+function lifecycleStepSummary(step) {
+  return {
+    step: step.step,
+    milestone_id: step.gate.milestone_id,
+    milestone_name: step.gate.milestone_name,
+    result: step.evaluation.result,
+    code: step.evaluation.code,
+    released_usd: step.state.released_usd,
+    remaining_usd: step.state.remaining_usd,
+    halted: step.halted_after_step,
+    halt_reason: step.state.halt_reason || null,
+    decision_content_hash: step.evaluation.proof.decision_content_hash
   };
 }
 
@@ -1100,6 +1131,7 @@ async function simulateLifecycle(args = {}) {
   const snapshot = await snapshotFromArgs(args);
   const gates = gatesFromArgs(args);
   const view = viewMode(args);
+  const stepsView = stepsViewMode(args, view);
   const haltOnBlock = args.halt_on_block !== false;
   let state = normalizeInstrumentProperties({
     ...snapshot.properties,
@@ -1134,11 +1166,14 @@ async function simulateLifecycle(args = {}) {
         updated_at: state.updated_at
       });
     } else {
+      const haltReason = evaluation.reason;
       state = normalizeInstrumentProperties({
         ...state,
+        state: haltOnBlock ? "Halted" : state.state,
         blocked_actions: state.blocked_actions + 1,
+        halt_reason: haltOnBlock ? haltReason : state.halt_reason,
         last_decision_result: evaluation.result,
-        last_decision_reason: evaluation.reason,
+        last_decision_reason: haltReason,
         evidence_refs: mergeEvidenceRefs(state.evidence_refs, gate.evidence_refs),
         updated_at: state.updated_at
       });
@@ -1157,7 +1192,7 @@ async function simulateLifecycle(args = {}) {
     steps.push({
       step: index + 1,
       gate,
-      evaluation: view === "full" ? evaluation : compactEvaluation(evaluation),
+      evaluation: stepsView === "full" || view === "full" ? evaluation : compactEvaluation(evaluation),
       halted_after_step: halted,
       state: {
         status: state.state,
@@ -1165,24 +1200,27 @@ async function simulateLifecycle(args = {}) {
         remaining_usd: state.remaining_usd,
         verified_milestones: state.verified_milestones,
         current_milestone: state.current_milestone,
-        blocked_actions: state.blocked_actions
+        blocked_actions: state.blocked_actions,
+        halt_reason: state.halt_reason
       }
     });
     if (halted) break;
   }
   const finalHashes = deriveProofHashes(state, { gate: lastGate, evidence_refs: state.evidence_refs });
+  const summarizedSteps = steps.map(lifecycleStepSummary);
 
-  return {
+  const response = {
     ok: true,
     simulated: true,
     halted,
     halt_on_block: haltOnBlock,
+    steps_view: stepsView,
     persisted: false,
     publicWrites: false,
     stateModel: "This helper threads state only inside the response. The public MCP does not persist lifecycle state; callers must carry returned state if they want to continue later.",
     policy_uri: "tradeflow://policy",
     initial: instrumentEnvelope(snapshot, { view }),
-    steps,
+    steps: stepsView === "evaluation" ? steps : summarizedSteps,
     final_instrument: instrumentEnvelope({
       ...snapshot,
       source: `simulation:${snapshot.source}`,
@@ -1191,6 +1229,8 @@ async function simulateLifecycle(args = {}) {
     final_hashes: finalHashes,
     final_hash_verification: hashVerification(declaredHashes(state), finalHashes)
   };
+  if (stepsView === "full") response.full_steps = steps;
+  return response;
 }
 
 async function evaluateAdversarialGate(args = {}) {
@@ -1206,23 +1246,30 @@ async function evaluateAdversarialGate(args = {}) {
       code: "argument_required"
     });
   }
-  const evaluationResult = await evaluateGateForMcp(args);
+  const snapshot = await snapshotFromArgs(args);
+  const gate = gateFromArgs(args);
+  const view = viewMode(args);
+  const evaluation = evaluateInstrumentGate(snapshot.properties, gate, {
+    source: `adversarial:${snapshot.source}`,
+    object: snapshot.object
+  });
   const expected = args.expect;
-  const actual = evaluationResult.evaluation.result;
+  const actual = evaluation.result;
   const matchedExpectation = expected === "blocked_or_escalated"
     ? actual !== "Approved"
     : actual === expected;
-  return {
+  const response = {
     ok: true,
     publicWrites: false,
     expected,
     actual,
     matchedExpectation,
     expectSemantics: "blocked_or_escalated matches Blocked, Needs evidence, and Approved with review.",
-    evaluation: evaluationResult.evaluation,
-    instrument: evaluationResult.instrument,
-    resultConvention: evaluationResult.resultConvention
+    evaluation: view === "full" ? evaluation : compactEvaluation(evaluation),
+    resultConvention: "ok=true means the adversarial tool executed. matchedExpectation=true means the verifier produced the expected result."
   };
+  if (view === "full") response.instrument = instrumentEnvelope(snapshot, { view: "full" });
+  return response;
 }
 
 async function redTeamScenario(args = {}) {

@@ -195,6 +195,7 @@ export function instrumentTemplateProperties() {
     released_usd: "number",
     remaining_usd: "number",
     blocked_actions: "number",
+    halt_reason: "string",
     policy_version: "number",
     policy_hash: "string",
     instrument_hash: "string",
@@ -244,6 +245,7 @@ export function normalizeInstrumentProperties(input = {}) {
     released_usd: released,
     remaining_usd: numberValue(input.remaining_usd, Math.max(0, value - released)),
     blocked_actions: numberValue(input.blocked_actions, 0),
+    halt_reason: stringValue(input.halt_reason),
     policy_version: numberValue(input.policy_version, 1),
     policy_hash: stringValue(input.policy_hash),
     instrument_hash: stringValue(input.instrument_hash),
@@ -259,6 +261,9 @@ export function normalizeInstrumentProperties(input = {}) {
 
 export function normalizeGateRequest(input = {}) {
   const evidenceRefs = normalizeEvidenceRefs(input.evidence_refs, []);
+  const evidenceType = input.evidence_type === undefined || input.evidence_type === ""
+    ? evidenceTypeFromRefs(evidenceRefs) || "BOL + GPS fix"
+    : stringValue(input.evidence_type, "BOL + GPS fix");
   return {
     milestone_id: stringValue(input.milestone_id, "loaded"),
     milestone_name: stringValue(input.milestone_name, "Cargo loaded"),
@@ -266,10 +271,15 @@ export function normalizeGateRequest(input = {}) {
     commodity_class: stringValue(input.commodity_class, "medical-devices"),
     release_usd: numberValue(input.release_usd, 29700),
     evidence_attached: evidenceRefs.length ? true : booleanValue(input.evidence_attached, true),
-    evidence_type: stringValue(input.evidence_type, "BOL + GPS fix"),
+    evidence_type: evidenceType,
     evidence_refs: evidenceRefs,
     customs_preclearance: booleanValue(input.customs_preclearance, true)
   };
+}
+
+function evidenceTypeFromRefs(evidenceRefs = []) {
+  const types = [...new Set(evidenceRefs.map((ref) => ref.type).filter(Boolean))];
+  return types.join(" + ");
 }
 
 export function defaultEvidenceRefs() {

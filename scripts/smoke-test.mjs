@@ -193,6 +193,21 @@ assert(Array.isArray(mcpApproved.evaluation.proof.evidence_refs), "MCP evaluator
 assert(mcpApproved.evaluation.proof.evidence_anchor.source === "instrument", "MCP evaluator declares instrument-level evidence fallback");
 assert(mcpApproved.publicWrites === false, "MCP evaluator reports no public writes");
 
+const mcpEvidenceType = mcpJson(await mcp("tools/call", {
+  name: "tradeflow_dual_evaluate_gate",
+  arguments: {
+    gate: {
+      milestone_id: "in_transit",
+      milestone_name: "In transit",
+      corridor: "SG-AU",
+      commodity_class: "medical-devices",
+      release_usd: 1,
+      evidence_refs: [{ type: "ais_track", id: "AIS-SG-AU-001", issuer: "Route oracle" }]
+    }
+  }
+}));
+assert(mcpEvidenceType.evaluation.gate.evidence_type === "ais_track", "MCP evaluator derives evidence_type from evidence refs");
+
 const mcpApprovedAgain = mcpJson(await mcp("tools/call", {
   name: "tradeflow_dual_evaluate_gate",
   arguments: {
@@ -291,9 +306,11 @@ const mcpSimulation = mcpJson(await mcp("tools/call", {
 }));
 assert(mcpSimulation.persisted === false, "MCP lifecycle simulation does not persist state");
 assert(mcpSimulation.steps.length === 4, "MCP lifecycle simulation runs default four milestones");
+assert(!("evaluation" in mcpSimulation.steps[0]), "MCP compact lifecycle steps are summary-only by default");
 assert(mcpSimulation.final_instrument.properties.released_usd === 148500, "MCP lifecycle simulation releases full seed value");
 assert(mcpSimulation.final_instrument.properties.state === "Settled", "MCP lifecycle simulation ends in settled state");
-assert(mcpSimulation.steps[3].evaluation.result === "Approved with review", "MCP lifecycle simulation preserves cumulative human-review escalation");
+assert(mcpSimulation.steps.some((step) => step.result === "Approved with review"), "MCP lifecycle simulation preserves cumulative human-review escalation");
+assert(mcpSimulation.steps.every((step) => step.decision_content_hash), "MCP lifecycle summary includes step decision hashes");
 assert(mcpSimulation.final_hash_verification.last_event_hash.verifies === true, "MCP lifecycle final event hash verifies against last gate context");
 
 const mcpBlockedSimulation = mcpJson(await mcp("tools/call", {
@@ -311,6 +328,8 @@ const mcpBlockedSimulation = mcpJson(await mcp("tools/call", {
 }));
 assert(mcpBlockedSimulation.halted === true, "MCP lifecycle simulation halts on blocked gate by default");
 assert(mcpBlockedSimulation.final_instrument.properties.blocked_actions === 1, "MCP lifecycle simulation increments blocked actions");
+assert(mcpBlockedSimulation.final_instrument.properties.state === "Halted", "MCP lifecycle halted simulation exposes halted terminal state");
+assert(mcpBlockedSimulation.final_instrument.properties.halt_reason, "MCP lifecycle halted simulation exposes halt reason");
 
 const mcpAdversarial = mcpJson(await mcp("tools/call", {
   name: "tradeflow_dual_evaluate_adversarial_gate",
@@ -328,6 +347,32 @@ const mcpAdversarial = mcpJson(await mcp("tools/call", {
 }));
 assert(mcpAdversarial.matchedExpectation === true, "MCP adversarial evaluator matches expected block");
 assert(mcpAdversarial.expectSemantics.includes("Approved with review"), "MCP adversarial evaluator documents blocked_or_escalated semantics");
+
+const mcpAdversarialOverride = mcpJson(await mcp("tools/call", {
+  name: "tradeflow_dual_evaluate_adversarial_gate",
+  arguments: {
+    expect: "Blocked",
+    instrument: {
+      instrument_id: "CTI-SG-AU-001",
+      state: "Issued",
+      corridor: "SG-AU",
+      commodity_class: "medical-devices",
+      value_usd: 148500,
+      max_instrument_usd: 180000,
+      sanctions_clear: true,
+      customs_preclearance: true
+    },
+    gate: {
+      milestone_id: "loaded",
+      milestone_name: "Cargo loaded",
+      corridor: "NZ-AU",
+      commodity_class: "medical-devices",
+      release_usd: 29700,
+      evidence_attached: true
+    }
+  }
+}));
+assert(mcpAdversarialOverride.matchedExpectation === true, "MCP adversarial evaluator handles instrument overrides");
 
 const mcpAdversarialMissingExpect = await mcp("tools/call", {
   name: "tradeflow_dual_evaluate_adversarial_gate",
