@@ -873,6 +873,43 @@ button svg {
   overflow-wrap: anywhere;
 }
 
+.proof-actions {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0 0 10px;
+}
+
+.proof-action {
+  align-items: center;
+  background: var(--ink);
+  border: 1px solid rgba(15, 42, 49, 0.1);
+  border-radius: 8px;
+  color: #fff;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 900;
+  justify-content: center;
+  letter-spacing: 0.04em;
+  min-height: 34px;
+  padding: 8px 10px;
+  text-align: center;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.proof-action:hover {
+  background: #163640;
+}
+
+.proof-action.disabled {
+  background: var(--surface-soft);
+  border-color: var(--line);
+  color: var(--muted);
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .readiness-grid {
   display: grid;
   gap: 8px;

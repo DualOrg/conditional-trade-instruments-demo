@@ -6,8 +6,9 @@
   "description": "DUAL Conditional Trade Instruments demo",
   "scripts": {
     "start": "node server.mjs",
-    "check": "node --check client.js && node --check server.mjs && node --check api/_dual.js && node --check api/dual/status.js && node --check api/instruments/current.js && node --check api/instruments/evaluate.js && node --check api/instruments/sync.js && node --check api/instruments/mint.js && node --check scripts/smoke-test.mjs && node --check scripts/setup-live-dual.mjs && node --check scripts/create-demo-entry.mjs",
+    "check": "node --check client.js && node --check server.mjs && node --check api/_dual.js && node --check api/dual/status.js && node --check api/instruments/current.js && node --check api/instruments/evaluate.js && node --check api/instruments/sync.js && node --check api/instruments/mint.js && node --check scripts/smoke-test.mjs && node --check scripts/setup-live-dual.mjs && node --check scripts/create-demo-entry.mjs && node --check scripts/check-demo-entry.mjs",
     "smoke": "node scripts/smoke-test.mjs",
+    "demo:ready": "node scripts/check-demo-entry.mjs",
     "demo:entry": "node scripts/create-demo-entry.mjs",
     "setup:dual-live": "node scripts/setup-live-dual.mjs"
   },

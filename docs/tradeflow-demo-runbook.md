@@ -27,10 +27,12 @@ The demo entry shows:
 1. Open the demo entry URL.
 2. Confirm DUAL readiness shows `Operator gated`, `readback configured`, and `event-bus gated`.
 3. Confirm Proof rail shows `source dual_readback` and verifier level `dual_readback_rederived`.
-4. Open the DUAL object explorer link from the Proof rail.
-5. Return to the app and open the DUAL template explorer link.
+4. Open `Open Object Proof` from the Proof rail.
+5. Return to the app and open `Open Template Proof`.
 6. Use the top action `VERIFY NEXT GATE` only when you want to demonstrate the local verifier flow for the next milestone.
 7. Use `GENERATE PROOF BUNDLE` to refresh the proof bundle view without exposing public writes.
+
+Use `docs/tradeflow-demo-script.md` for the short talk track and `docs/tradeflow-reviewer-pack.md` for the handoff checklist.
 
 ## Live DUAL Sync
 
@@ -52,6 +54,14 @@ DUAL_PERSISTENCE_MODE=dual
 ```
 
 The script calls the operator-gated `/api/instruments/sync` endpoint, then reads `/api/proof` back and prints only non-secret proof identifiers and hashes.
+
+To check readiness without executing a write:
+
+```text
+npm run demo:ready
+```
+
+The readiness report prints only presence/length checks for local sensitive values, never the values themselves.
 
 ## Safety Boundary
 

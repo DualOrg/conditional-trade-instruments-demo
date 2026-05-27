@@ -754,6 +754,7 @@ function renderDualProof() {
   $("proofTemplateId").textContent = proof.templateId ? shortHash(proof.templateId) : "pending";
   $("proofSource").textContent = proof.source || "pending";
   renderProofLinks(proof.links || []);
+  renderPrimaryProofActions(proof.links || []);
 }
 
 function renderProofLinks(links = []) {
@@ -771,6 +772,33 @@ function renderProofLinks(links = []) {
       <small>${escapeHtml(link.detail || "Open proof")}</small>
     </a>
   `).join("");
+}
+
+function renderPrimaryProofActions(links = []) {
+  const objectLink = links.find((link) => link?.id === "dual-blockexplorer-object")
+    || links.find((link) => /object/i.test(link?.label || ""));
+  const templateLink = links.find((link) => link?.id === "dual-blockexplorer-template")
+    || links.find((link) => /template/i.test(link?.label || ""));
+  setProofAction("proofObjectAction", objectLink, "Open Object Proof");
+  setProofAction("proofTemplateAction", templateLink, "Open Template Proof");
+}
+
+function setProofAction(id, link, fallbackLabel) {
+  const element = $(id);
+  element.textContent = fallbackLabel;
+  if (link?.href) {
+    element.href = link.href;
+    element.target = "_blank";
+    element.rel = "noreferrer";
+    element.classList.remove("disabled");
+    element.removeAttribute("aria-disabled");
+    return;
+  }
+  element.removeAttribute("href");
+  element.removeAttribute("target");
+  element.removeAttribute("rel");
+  element.classList.add("disabled");
+  element.setAttribute("aria-disabled", "true");
 }
 
 function renderMilestones() {

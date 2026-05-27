@@ -45,6 +45,12 @@ The app demonstrates:
 
 The prepared demo entry opens with Cargo loaded verified, USD 29,700 released, Customs cleared as the next gate, and the live DUAL proof rail visible. See `docs/tradeflow-demo-runbook.md`.
 
+Demo operator docs:
+
+- `docs/tradeflow-demo-runbook.md`
+- `docs/tradeflow-demo-script.md`
+- `docs/tradeflow-reviewer-pack.md`
+
 ## API Surface
 
 Safe read/evaluate endpoints:
@@ -172,3 +178,9 @@ npm run demo:entry
 ```
 
 This syncs the canonical Cargo loaded demo entry into the configured DUAL object and reads the proof bundle back. The command prints object/template ids and proof hashes only; it does not print secrets.
+
+To check proof/readiness without executing a write:
+
+```text
+npm run demo:ready
+```
