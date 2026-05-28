@@ -263,6 +263,7 @@ const mime = {
 const routes = new Map([
   ["GET /api/dual/status", dualStatus],
   ["GET /api/proof", proofApi],
+  ["GET /api/proof/rederive", proofRecomputeApi],
   ["GET /api/instruments/current", currentInstrument],
   ["POST /api/instruments/evaluate", evaluateInstrument],
   ["POST /api/instruments/sync", syncInstrument],
@@ -331,6 +332,12 @@ async function proofApi(_request, response) {
     links: proof.links,
     publicWrites: false
   });
+}
+
+async function proofRecomputeApi(_request, response) {
+  const proof = await buildProofBundle(null, { view: "full" });
+  const verification = await verifyProofBundle({ view: "full" });
+  response.status(200).json(rederiveProofReport(proof, verification));
 }
 
 async function serveStatic(pathname, response) {
@@ -1121,6 +1128,94 @@ async function verifyProofBundle(options = {}) {
       : "DUAL readback is not configured, so hashes are re-derived from the deterministic seed instrument.",
     checks,
     caveats: proof.caveats
+  };
+}
+
+function rederiveProofReport(proof, verification) {
+  const properties = proof.instrument.properties;
+  const rederivedHashes = deriveProofHashes(properties);
+  const declared = declaredHashes(properties);
+  const rederivedBundleHash = hashJson({
+    template: proof.template,
+    object: proof.object,
+    instrument: proof.instrument,
+    hashes: proof.hashes,
+    declared_hashes: proof.declared_hashes,
+    caveats: proof.caveats
+  });
+  const objectLink = proof.links?.find((link) => link.id === "dual-blockexplorer-object") || null;
+  const stateLink = proof.links?.find((link) => link.id === "dual-blockexplorer-state") || objectLink;
+  const integrityLink = proof.links?.find((link) => link.id === "dual-blockexplorer-integrity") || objectLink;
+
+  return {
+    ok: verification.ok && rederivedBundleHash === proof.bundle_hash,
+    source: proof.source,
+    publicWrites: false,
+    algorithm: "sha256(JSON.stringify(stableSort(value)))",
+    copyPaste: {
+      local: "npm run proof:rederive -- https://conditional-trade-instruments.vercel.app",
+      remote: "curl -s https://conditional-trade-instruments.vercel.app/api/proof/rederive"
+    },
+    instrument_id: properties.instrument_id,
+    canonical_inputs: {
+      policy: {
+        corridor: properties.corridor,
+        commodity_class: properties.commodity_class,
+        max_instrument_usd: properties.max_instrument_usd,
+        review_threshold_usd: properties.review_threshold_usd,
+        sanctions_clear: properties.sanctions_clear,
+        customs_preclearance: properties.customs_preclearance,
+        policy_version: properties.policy_version
+      },
+      instrument: {
+        instrument_id: properties.instrument_id,
+        buyer: properties.buyer,
+        supplier: properties.supplier,
+        corridor: properties.corridor,
+        commodity_class: properties.commodity_class,
+        payment_rail: properties.payment_rail,
+        value_usd: properties.value_usd,
+        max_instrument_usd: properties.max_instrument_usd
+      },
+      evidence_refs: properties.evidence_refs,
+      settlement: {
+        instrument_id: properties.instrument_id,
+        released_usd: properties.released_usd,
+        remaining_usd: properties.remaining_usd,
+        state: properties.state
+      },
+      event: {
+        instrument_id: properties.instrument_id,
+        current_milestone: properties.current_milestone,
+        last_decision_result: properties.last_decision_result,
+        last_decision_reason: properties.last_decision_reason,
+        policy_hash: rederivedHashes.policy_hash,
+        instrument_hash: rederivedHashes.instrument_hash,
+        settlement_hash: rederivedHashes.settlement_hash
+      }
+    },
+    hashes: {
+      declared,
+      rederived: rederivedHashes,
+      verification: hashVerification(declared, rederivedHashes)
+    },
+    bundle_hash: {
+      declared: proof.bundle_hash,
+      rederived: rederivedBundleHash,
+      verifies: rederivedBundleHash === proof.bundle_hash
+    },
+    dual_state_hash: {
+      declared: proof.instrument.object.state_hash,
+      verification: "DUAL canonical object state hash from readback; verify through the linked DUAL explorer object page.",
+      explorer: stateLink?.href || null
+    },
+    dual_integrity_hash: {
+      declared: proof.instrument.object.integrity_hash,
+      verification: "DUAL canonical object integrity hash from readback; verify through the linked DUAL explorer object page.",
+      explorer: integrityLink?.href || null
+    },
+    limitation: "This endpoint and npm script rederive the portable TradeFlow proof hashes and bundle hash from public proof JSON. DUAL state_hash and integrity_hash are DUAL-chain canonical values and are linked to the block explorer rather than reserialized by this app.",
+    links: proof.links || []
   };
 }
 

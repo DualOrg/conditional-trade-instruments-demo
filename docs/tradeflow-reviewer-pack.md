@@ -28,6 +28,7 @@ https://github.com/DualOrg/conditional-trade-instruments-demo
 
 ## What To Verify
 
+- The public banner says the shipment/payment story is synthetic demo data while the DUAL object, template, hashes, bundle, and explorer links are real testnet anchors.
 - The prepared route opens directly into Cargo loaded verified.
 - The instrument is `CTI-SG-AU-001`.
 - Released amount is USD 29,700.
@@ -39,6 +40,8 @@ https://github.com/DualOrg/conditional-trade-instruments-demo
 - `Open Template Proof` opens the DUAL template explorer.
 - `Reviewer Mode` walks through instrument, mandate, milestone, DUAL readiness, proof rail, and verifier boundary.
 - The proof rail exposes object, template, state hash, integrity hash, proof bundle, and L2 state-hash links.
+- `Recompute Proof` opens a public verifier report for reviewer-side hash re-derivation.
+- `Preview breach` visibly produces a blocked decision and decision hash without writing to DUAL.
 - Public writes remain disabled.
 
 ## Live Proof IDs
@@ -67,6 +70,20 @@ Run the local readiness report:
 ```bash
 npm run demo:ready
 ```
+
+Recompute the portable proof hashes from public JSON:
+
+```bash
+npm run proof:rederive -- https://conditional-trade-instruments.vercel.app
+```
+
+Or read the hosted re-derive report:
+
+```bash
+curl -s https://conditional-trade-instruments.vercel.app/api/proof/rederive
+```
+
+The re-derive path uses `sha256(JSON.stringify(stableSort(value)))` to recompute the policy, instrument, evidence, event, settlement, and bundle hashes. DUAL `state_hash` and `integrity_hash` are DUAL-chain canonical readback values; verify those via the linked DUAL block explorer object page.
 
 ## MCP Checks
 

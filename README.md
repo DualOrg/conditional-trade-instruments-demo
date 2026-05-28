@@ -51,6 +51,8 @@ The app demonstrates:
 
 The prepared demo entry opens with Cargo loaded verified, USD 29,700 released, Customs cleared as the next gate, and the live DUAL proof rail visible. See `docs/tradeflow-demo-runbook.md`.
 
+The shipment itself is synthetic demo data. The DUAL object, template, readback hashes, verifier bundle, and block explorer links are real testnet anchors.
+
 Demo operator docs:
 
 - `docs/tradeflow-demo-runbook.md`
@@ -63,6 +65,8 @@ Safe read/evaluate endpoints:
 
 - `POST /mcp`
 - `GET /api/dual/status`
+- `GET /api/proof`
+- `GET /api/proof/rederive`
 - `GET /api/instruments/current`
 - `POST /api/instruments/evaluate`
 
@@ -200,5 +204,13 @@ To check proof/readiness without executing a write:
 ```text
 npm run demo:ready
 ```
+
+To rederive the public proof bundle hash and portable TradeFlow hash classes from public JSON:
+
+```text
+npm run proof:rederive -- https://conditional-trade-instruments.vercel.app
+```
+
+The rederive report recomputes the policy, instrument, evidence, event, settlement, and bundle hashes with `sha256(JSON.stringify(stableSort(value)))`. The DUAL `state_hash` and `integrity_hash` are DUAL-chain canonical values and remain linked to the block explorer rather than reserialized by this app.
 
 Controlled operator sync can also run from GitHub Actions using the template in `docs/tradeflow-demo-entry.workflow.yml`. Publishing that template as `.github/workflows/tradeflow-demo-entry.yml` requires a GitHub token with `workflow` scope and repository secret `DEMO_OPERATOR_TOKEN`.

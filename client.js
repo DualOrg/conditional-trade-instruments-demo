@@ -4,6 +4,7 @@ const initialState = {
   nonce: 1,
   policyVersion: 1,
   exported: false,
+  localPreviewDirty: false,
   lastDecision: {
     result: "Ready",
     reason: "Awaiting next verification",
@@ -406,6 +407,10 @@ function syncFromInputs() {
   state.instrument.paymentRail = $("paymentRail").value;
 }
 
+function markPreviewDirty() {
+  state.localPreviewDirty = true;
+}
+
 function bindInputs() {
   $("corridorSelect").value = state.instrument.corridor;
   $("commoditySelect").value = state.instrument.commodity;
@@ -429,8 +434,9 @@ function verifiedCount() {
 }
 
 function blockedCount() {
-  return state.audit.filter((item) => item.type === "block").length
-    + state.milestones.filter((milestone) => milestone.status === "blocked").length;
+  const blockedMilestones = state.milestones.filter((milestone) => milestone.status === "blocked").length;
+  const blockedAuditEvents = state.audit.filter((item) => item.type === "block").length;
+  return blockedMilestones || blockedAuditEvents;
 }
 
 function releasedAmount() {
@@ -578,7 +584,9 @@ function currentToken() {
       blocked_actions: blockedCount(),
       latest_policy_hash: shortHash(state.instrument.hashes.policy),
       dual_readback_ready: Boolean(state.dualStatus?.readbackReady),
-      public_writes: Boolean(state.dualStatus?.publicWrites)
+      public_writes: Boolean(state.dualStatus?.publicWrites),
+      proof_anchor: state.dualProof?.objectId ? `DUAL object ${shortHash(state.dualProof.objectId)}` : "seed object",
+      local_preview_dirty: Boolean(state.localPreviewDirty)
     }
   };
 }
@@ -712,6 +720,27 @@ async function refreshHashes() {
   state.instrument.hashes.settlement = await digest(settlementPayload);
 }
 
+async function postVerifierGate(gate) {
+  await refreshHashes();
+  const response = await fetch("/api/instruments/evaluate", {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      instrument: currentInstrumentProperties(),
+      gate
+    })
+  });
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload?.error?.message || `Verifier returned HTTP ${response.status}`);
+  return {
+    evaluation: payload.evaluation || {},
+    publicWrites: Boolean(payload.publicWrites)
+  };
+}
+
 function renderRouteMap() {
   const view = state.selectedView || "timeline";
   $("routeMap").className = `route-map ${view === "evidence" ? "evidence-view" : view === "payments" ? "payment-view" : ""}`;
@@ -841,6 +870,15 @@ function renderDualProof() {
   $("proofSource").textContent = proof.source || "pending";
   renderProofLinks(proof.links || []);
   renderPrimaryProofActions(proof.links || []);
+}
+
+function renderControlAnchorNote() {
+  const note = $("controlAnchorNote");
+  const object = state.dualProof?.objectId ? `DUAL object ${shortHash(state.dualProof.objectId)}` : "the seed object";
+  note.classList.toggle("preview-dirty", Boolean(state.localPreviewDirty));
+  note.textContent = state.localPreviewDirty
+    ? `Local preview changed. The proof rail is still pinned to ${object}; only an operator-gated sync can persist a new DUAL state.`
+    : `Controls update local preview only. The proof rail remains pinned to ${object} until an operator-gated sync writes a new state.`;
 }
 
 function renderProofLinks(links = []) {
@@ -1091,12 +1129,14 @@ async function render() {
   renderDualReadiness();
   renderDualProof();
   renderVerifier();
+  renderControlAnchorNote();
   renderAudit();
   renderReviewerGuide();
 }
 
 async function savePolicy() {
   syncFromInputs();
+  markPreviewDirty();
   state.policyVersion += 1;
   state.exported = false;
   setNextActive();
@@ -1112,6 +1152,7 @@ async function savePolicy() {
 
 async function attachEvidence() {
   syncFromInputs();
+  markPreviewDirty();
   const next = nextMilestone();
   if (!next) {
     state.lastDecision = {
@@ -1138,6 +1179,7 @@ async function attachEvidence() {
 
 async function verifyNextGate() {
   syncFromInputs();
+  markPreviewDirty();
   const next = nextMilestone();
   const evaluation = evaluatePolicy(next);
 
@@ -1171,6 +1213,7 @@ async function verifyNextGate() {
 
 async function forceBreach() {
   syncFromInputs();
+  markPreviewDirty();
   const next = nextMilestone();
   if (!next) {
     state.lastDecision = {
@@ -1182,16 +1225,52 @@ async function forceBreach() {
     await render();
     return;
   }
+  const breachGate = {
+    ...currentGateRequest(),
+    milestone_id: next.id,
+    milestone_name: next.name,
+    corridor: state.instrument.corridor === "SG-AU" ? "NZ-AU" : "SG-AU",
+    evidence_attached: true,
+    evidence_type: `${next.evidence} red-team packet`
+  };
+  let evaluation = null;
+  let publicWrites = false;
+  try {
+    const verified = await postVerifierGate(breachGate);
+    evaluation = verified.evaluation;
+    publicWrites = verified.publicWrites;
+  } catch (error) {
+    evaluation = {
+      result: "Blocked",
+      reason: error.message || "Verifier API unavailable; local breach preview blocked.",
+      source: "browser_fallback",
+      proof: {
+        decision_hash: await digest(JSON.stringify({
+          instrument: currentInstrumentProperties(),
+          gate: breachGate,
+          result: "Blocked"
+        }))
+      }
+    };
+  }
   next.status = "blocked";
   next.evidenceAttached = true;
   state.exported = false;
+  state.verifierResult = {
+    ran: true,
+    result: evaluation.result || "Blocked",
+    reason: evaluation.reason || "Red-team breach blocked before release.",
+    source: evaluation.source || "public evaluator",
+    decisionHash: evaluation.proof?.decision_hash || "",
+    publicWrites
+  };
   state.lastDecision = {
-    result: "Blocked",
-    reason: "Red-team customs evidence references an unapproved corridor",
-    evidence: next.evidence,
+    result: state.verifierResult.result,
+    reason: state.verifierResult.reason,
+    evidence: `${next.evidence} -> decision ${shortHash(state.verifierResult.decisionHash)}`,
     tone: "block"
   };
-  addAudit("block", "Policy breach blocked", `${next.name} rejected because the evidence packet does not match the mandate corridor.`);
+  addAudit("block", "Verifier refusal proof", `${next.name} rejected with decision hash ${shortHash(state.verifierResult.decisionHash)}.`);
   await render();
 }
 
@@ -1211,31 +1290,16 @@ async function exportProof() {
 
 async function runVerifier() {
   syncFromInputs();
-  await refreshHashes();
-  const body = {
-    instrument: currentInstrumentProperties(),
-    gate: currentGateRequest()
-  };
 
   try {
-    const response = await fetch("/api/instruments/evaluate", {
-      method: "POST",
-      headers: {
-        accept: "application/json",
-        "content-type": "application/json"
-      },
-      body: JSON.stringify(body)
-    });
-    const payload = await response.json();
-    if (!response.ok) throw new Error(payload?.error?.message || `Verifier returned HTTP ${response.status}`);
-    const evaluation = payload.evaluation || {};
+    const { evaluation, publicWrites } = await postVerifierGate(currentGateRequest());
     state.verifierResult = {
       ran: true,
       result: evaluation.result || "No decision",
       reason: evaluation.reason || "Verifier returned no reason.",
       source: evaluation.source || "request",
       decisionHash: evaluation.proof?.decision_hash || "",
-      publicWrites: Boolean(payload.publicWrites)
+      publicWrites
     };
     addAudit("ok", "Verifier API checked", `${state.verifierResult.result}: ${state.verifierResult.reason}`);
   } catch (error) {
@@ -1255,6 +1319,7 @@ async function runVerifier() {
 
 async function resetDemo() {
   state = clone(initialState);
+  state.localPreviewDirty = false;
   bindInputs();
   await refreshDualStatus();
   await refreshDualProof();
@@ -1277,6 +1342,7 @@ function wireEvents() {
   ["corridorSelect", "commoditySelect", "buyerAgent", "maxInstrumentUsd", "reviewThreshold", "sanctionsClear", "customsPreclearance", "instrumentValue", "paymentRail"].forEach((id) => {
     $(id).addEventListener("change", async () => {
       syncFromInputs();
+      markPreviewDirty();
       await render();
     });
   });

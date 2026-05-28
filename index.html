@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TradeFlow Control Desk</title>
-    <link rel="stylesheet" href="./styles.css?v=20260528-reviewer-mode" />
+    <link rel="stylesheet" href="./styles.css?v=20260528-peer-gate" />
   </head>
   <body>
     <div class="app-shell">
@@ -24,8 +24,12 @@
             <strong>Singapore (SGP) &rarr; Australia (AUS)</strong>
           </div>
           <div>
-            <span>Instrument</span>
-            <strong>DUAL-TFI-2025-00017</strong>
+            <span>Trade instrument</span>
+            <strong>CTI-SG-AU-001</strong>
+          </div>
+          <div>
+            <span>DUAL object</span>
+            <strong>6a167b2c...55a86dd</strong>
           </div>
         </div>
         <div class="topbar-actions">
@@ -51,6 +55,11 @@
           </button>
         </div>
       </header>
+
+      <section class="demo-disclosure" aria-label="Demo disclosure">
+        <strong>Synthetic shipment, live DUAL proof.</strong>
+        <span>The cargo, payment, and evidence names are demo data. The DUAL object, template, readback hashes, verifier bundle, and block explorer links are real testnet anchors.</span>
+      </section>
 
       <main class="workspace">
         <aside class="panel left-panel">
@@ -137,9 +146,10 @@
                 <option value="erp-payable">ERP payable trigger</option>
               </select>
             </label>
+            <p class="control-note" id="controlAnchorNote">Controls update a local preview. The proof rail remains pinned to the live DUAL object until an operator-gated sync writes a new state.</p>
             <div class="button-grid">
               <button class="secondary-btn" id="attachEvidenceBtn">Attach evidence</button>
-              <button class="danger-btn" id="forceBreachBtn">Force breach</button>
+              <button class="danger-btn" id="forceBreachBtn">Preview breach</button>
             </div>
           </section>
         </aside>
@@ -279,6 +289,7 @@
             <div class="proof-actions" aria-label="Primary proof explorer actions">
               <a class="proof-action disabled" id="proofObjectAction" aria-disabled="true">Open Object Proof</a>
               <a class="proof-action disabled" id="proofTemplateAction" aria-disabled="true">Open Template Proof</a>
+              <a class="proof-action" id="proofRecomputeAction" href="/api/proof/rederive" target="_blank" rel="noreferrer">Recompute Proof</a>
             </div>
             <div class="proof-list">
               <div><span>Instrument hash</span><code id="instrumentHash">pending</code></div>
@@ -375,6 +386,6 @@
         </div>
       </section>
     </div>
-    <script src="./client.js?v=20260528-reviewer-mode"></script>
+    <script src="./client.js?v=20260528-peer-gate"></script>
   </body>
 </html>

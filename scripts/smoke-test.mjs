@@ -43,13 +43,18 @@ function mcpJson(result) {
 
 const home = await fetch(baseUrl);
 assert(home.ok, "home page loads");
-assert((await home.text()).includes("TradeFlow Control Desk"), "home page includes demo title");
+const homeHtml = await home.text();
+assert(homeHtml.includes("TradeFlow Control Desk"), "home page includes demo title");
+assert(homeHtml.includes("Synthetic shipment, live DUAL proof"), "home page discloses synthetic shipment and live proof boundary");
+assert(homeHtml.includes("CTI-SG-AU-001"), "home page uses canonical trade instrument id");
+assert(homeHtml.includes("Recompute Proof"), "home page includes proof recompute action");
 
 const reviewerHome = await fetch(`${baseUrl}/?demo=operator-cargo&reviewer=1`);
 const reviewerHtml = await reviewerHome.text();
 assert(reviewerHome.ok, "prepared reviewer route loads");
 assert(reviewerHtml.includes("reviewerGuide"), "prepared reviewer route includes reviewer guide shell");
 assert(reviewerHtml.includes("Open Object Proof"), "prepared reviewer route includes primary proof action");
+assert(reviewerHtml.includes("Preview breach"), "prepared reviewer route includes negative-path proof action");
 
 const status = await request("/api/dual/status");
 assert(status.response.ok, "status endpoint returns 200");
@@ -73,6 +78,12 @@ if (apiProof.body.proof?.object?.readback_ready) {
   assert(apiProof.body.proof.instrument?.object?.state_hash, "proof endpoint exposes DUAL state hash");
   assert(apiProof.body.proof.instrument?.object?.integrity_hash, "proof endpoint exposes DUAL integrity hash");
 }
+
+const apiRecompute = await request("/api/proof/rederive");
+assert(apiRecompute.response.ok, "proof rederive endpoint returns 200");
+assert(apiRecompute.body.publicWrites === false, "proof rederive endpoint reports no public writes");
+assert(apiRecompute.body.bundle_hash?.verifies === true, "proof rederive endpoint recomputes bundle hash");
+assert(apiRecompute.body.hashes?.verification?.policy_hash?.verifies !== false, "proof rederive endpoint reports policy hash verification");
 
 const approvedEvaluation = await request("/api/instruments/evaluate", {
   method: "POST",

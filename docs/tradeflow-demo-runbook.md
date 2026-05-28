@@ -2,6 +2,8 @@
 
 This runbook creates and presents the canonical TradeFlow demo entry: the buyer mandate is active, Cargo loaded evidence has been accepted, USD 29,700 is released through the escrow mirror, and DUAL proof readback is visible with block explorer links.
 
+Disclosure line for cold reviewers: the shipment, payment, and evidence names are synthetic demo data; the DUAL object, template, readback hashes, verifier bundle, and block explorer links are live testnet anchors.
+
 ## Demo Entry
 
 Use this URL for the prepared operator view:
@@ -35,9 +37,11 @@ The demo entry shows:
 3. Confirm Proof rail shows `source dual_readback` and verifier level `dual_readback_rederived`.
 4. Open `Open Object Proof` from the Proof rail.
 5. Return to the app and open `Open Template Proof`.
-6. Use `REVIEWER MODE` when the audience needs the guided mandate -> milestone -> DUAL proof -> verifier path.
-7. Use the top action `VERIFY NEXT GATE` only when you want to demonstrate the local verifier flow for the next milestone.
-8. Use `GENERATE PROOF BUNDLE` to refresh the proof bundle view without exposing public writes.
+6. Open `Recompute Proof` to show the public re-derivation report.
+7. Use `REVIEWER MODE` when the audience needs the guided mandate -> milestone -> DUAL proof -> verifier path.
+8. Use `PREVIEW BREACH` to show the system saying no with a blocked decision hash.
+9. Use the top action `VERIFY NEXT GATE` only when you want to demonstrate the local verifier flow for the next milestone.
+10. Use `GENERATE PROOF BUNDLE` to refresh the proof bundle view without exposing public writes.
 
 Use `docs/tradeflow-demo-script.md` for the short talk track and `docs/tradeflow-reviewer-pack.md` for the handoff checklist.
 
@@ -79,6 +83,14 @@ To check readiness without executing a write:
 ```text
 npm run demo:ready
 ```
+
+To rederive the portable proof hashes without credentials:
+
+```text
+npm run proof:rederive -- https://conditional-trade-instruments.vercel.app
+```
+
+The same report is hosted at `/api/proof/rederive`. It recomputes the policy, instrument, evidence, event, settlement, and bundle hashes from public JSON and links the DUAL state/integrity hashes to the explorer.
 
 The readiness report prints only presence/length checks for local sensitive values, never the values themselves.
 
