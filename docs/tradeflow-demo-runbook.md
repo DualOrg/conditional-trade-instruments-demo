@@ -54,7 +54,11 @@ For the production deployment, the caller needs one of:
 ```text
 DEMO_OPERATOR_TOKEN
 DEMO_OPERATOR_TOKEN_FILE
+DEMO_ENV_FILE
 ```
+
+Use `DEMO_ENV_FILE` only for a temporary env file outside the repo, such as a short-lived Vercel env pull. Delete the file immediately after the sync.
+If Vercel env pull returns empty sensitive values for this account, rotate only `DEMO_OPERATOR_TOKEN` in Vercel to a private temp token file, redeploy, run with `DEMO_OPERATOR_TOKEN_FILE`, then delete the local token file.
 
 The production deployment already carries the DUAL read/write environment. When running the endpoint locally, the local server also needs:
 

@@ -94,6 +94,7 @@ Live writes require:
 
 ```text
 DEMO_OPERATOR_TOKEN
+DEMO_ENV_FILE
 DUAL_API_KEY
 DUAL_CONDITIONAL_TRADE_TEMPLATE_ID
 DUAL_CONDITIONAL_TRADE_OBJECT_ID
@@ -107,4 +108,4 @@ When those are present locally, run:
 npm run demo:entry
 ```
 
-For the production deployment, the caller needs `DEMO_OPERATOR_TOKEN` or `DEMO_OPERATOR_TOKEN_FILE`; DUAL API credentials stay in the Vercel environment. The same sync can be run from GitHub Actions by publishing `docs/tradeflow-demo-entry.workflow.yml` to `.github/workflows/tradeflow-demo-entry.yml` with repository secret `DEMO_OPERATOR_TOKEN`.
+For the production deployment, the caller needs `DEMO_OPERATOR_TOKEN`, `DEMO_OPERATOR_TOKEN_FILE`, or `DEMO_ENV_FILE` with `DEMO_OPERATOR_TOKEN`; DUAL API credentials stay in the Vercel environment. If sensitive values cannot be read back from Vercel, rotate only the operator token, redeploy, run with a private `DEMO_OPERATOR_TOKEN_FILE`, and delete the local token file afterward. The same sync can be run from GitHub Actions by publishing `docs/tradeflow-demo-entry.workflow.yml` to `.github/workflows/tradeflow-demo-entry.yml` with repository secret `DEMO_OPERATOR_TOKEN`.

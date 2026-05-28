@@ -183,7 +183,17 @@ With the production operator environment loaded:
 npm run demo:entry
 ```
 
-This syncs the canonical Cargo loaded demo entry into the configured DUAL object and reads the proof bundle back. For the production deployment, the local caller only needs `DEMO_OPERATOR_TOKEN` or `DEMO_OPERATOR_TOKEN_FILE`; DUAL read/write credentials stay in the deployment environment. The command prints object/template ids and proof hashes only; it does not print secrets.
+This syncs the canonical Cargo loaded demo entry into the configured DUAL object and reads the proof bundle back. For the production deployment, the local caller only needs `DEMO_OPERATOR_TOKEN`, `DEMO_OPERATOR_TOKEN_FILE`, or `DEMO_ENV_FILE` pointing at a temporary env file that contains `DEMO_OPERATOR_TOKEN`; DUAL read/write credentials stay in the deployment environment. The command prints object/template ids and proof hashes only; it does not print secrets.
+
+For a controlled local operator run using Vercel production env, pull the env file outside the repo, run the command with `DEMO_ENV_FILE`, then delete the temp file:
+
+```bash
+npx --yes vercel@latest env pull /private/tmp/tradeflow-prod.env --environment=production
+DEMO_ENV_FILE=/private/tmp/tradeflow-prod.env npm run demo:entry
+rm /private/tmp/tradeflow-prod.env
+```
+
+If the Vercel account can list env names but cannot read sensitive values back, rotate only `DEMO_OPERATOR_TOKEN` in Vercel to a private temp token file, redeploy, run with `DEMO_OPERATOR_TOKEN_FILE`, then delete the local token file.
 
 To check proof/readiness without executing a write:
 

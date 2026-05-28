@@ -1,6 +1,34 @@
-const baseUrl = (process.env.DEMO_BASE_URL || "https://conditional-trade-instruments.vercel.app").replace(/\/+$/, "");
+import { readFileSync } from "node:fs";
+
+const envFile = readEnvFile(process.env.DEMO_ENV_FILE);
+
+function envValue(name) {
+  return process.env[name] || envFile[name] || "";
+}
+
+function readEnvFile(filePath = "") {
+  if (!filePath) return {};
+  const raw = readFileSync(filePath, "utf8");
+  const parsed = {};
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const separator = trimmed.indexOf("=");
+    if (separator <= 0) continue;
+    const key = trimmed.slice(0, separator).trim();
+    let value = trimmed.slice(separator + 1).trim();
+    if ((value.startsWith("\"") && value.endsWith("\"")) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+    parsed[key] = value.replace(/\\n/g, "\n");
+  }
+  return parsed;
+}
+
+const baseUrl = (envValue("DEMO_BASE_URL") || "https://conditional-trade-instruments.vercel.app").replace(/\/+$/, "");
 
 const envNames = [
+  "DEMO_ENV_FILE",
   "DEMO_OPERATOR_TOKEN",
   "DEMO_OPERATOR_TOKEN_FILE",
   "DUAL_API_KEY",
@@ -34,9 +62,9 @@ async function readJson(path) {
 const env = Object.fromEntries(envNames.map((name) => [
   name,
   {
-    present: Boolean(process.env[name]),
-    length: (process.env[name] || "").length,
-    value: name.endsWith("_MODE") ? process.env[name] || "" : undefined
+    present: Boolean(envValue(name)),
+    length: envValue(name).length,
+    value: name.endsWith("_MODE") ? envValue(name) : undefined
   }
 ]));
 
@@ -45,7 +73,7 @@ const proofResponse = await readJson("/api/proof");
 const status = statusResponse.body || {};
 const proof = proofResponse.body || {};
 const proofObject = proof.proof?.instrument?.object || {};
-const operatorReady = Boolean(process.env.DEMO_OPERATOR_TOKEN || process.env.DEMO_OPERATOR_TOKEN_FILE);
+const operatorReady = Boolean(envValue("DEMO_OPERATOR_TOKEN") || envValue("DEMO_OPERATOR_TOKEN_FILE"));
 const liveSyncRunnable = operatorReady && Boolean(status.writable);
 
 const report = {

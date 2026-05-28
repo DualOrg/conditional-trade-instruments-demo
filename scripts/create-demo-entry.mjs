@@ -4,15 +4,39 @@ import {
 } from "../api/_dual.js";
 import { readFileSync } from "node:fs";
 
-const baseUrl = (process.env.DEMO_BASE_URL || "https://conditional-trade-instruments.vercel.app").replace(/\/+$/, "");
-const operatorToken = process.env.DEMO_OPERATOR_TOKEN || readOperatorTokenFile();
+const envFile = readEnvFile(process.env.DEMO_ENV_FILE);
+const baseUrl = (envValue("DEMO_BASE_URL") || "https://conditional-trade-instruments.vercel.app").replace(/\/+$/, "");
+const operatorToken = envValue("DEMO_OPERATOR_TOKEN") || readOperatorTokenFile();
 
 if (!operatorToken) {
-  throw new Error("DEMO_OPERATOR_TOKEN or DEMO_OPERATOR_TOKEN_FILE is required to create the live TradeFlow demo entry.");
+  throw new Error("DEMO_OPERATOR_TOKEN, DEMO_OPERATOR_TOKEN_FILE, or DEMO_ENV_FILE with DEMO_OPERATOR_TOKEN is required to create the live TradeFlow demo entry.");
+}
+
+function envValue(name) {
+  return process.env[name] || envFile[name] || "";
+}
+
+function readEnvFile(filePath = "") {
+  if (!filePath) return {};
+  const raw = readFileSync(filePath, "utf8");
+  const parsed = {};
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const separator = trimmed.indexOf("=");
+    if (separator <= 0) continue;
+    const key = trimmed.slice(0, separator).trim();
+    let value = trimmed.slice(separator + 1).trim();
+    if ((value.startsWith("\"") && value.endsWith("\"")) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+    parsed[key] = value.replace(/\\n/g, "\n");
+  }
+  return parsed;
 }
 
 function readOperatorTokenFile() {
-  const filePath = process.env.DEMO_OPERATOR_TOKEN_FILE || "";
+  const filePath = envValue("DEMO_OPERATOR_TOKEN_FILE");
   if (!filePath) return "";
   return readFileSync(filePath, "utf8").trim();
 }
@@ -105,6 +129,7 @@ const sync = await request("/api/instruments/sync", {
 
 const proof = await request("/api/proof");
 const proofObject = proof.proof?.instrument?.object || {};
+const proofProperties = proof.proof?.instrument?.properties || {};
 
 console.log(JSON.stringify({
   ok: true,
@@ -114,9 +139,10 @@ console.log(JSON.stringify({
   payloadStyle: sync.payloadStyle,
   objectId: sync.object?.id || proof.proof?.object?.object_id || null,
   templateId: sync.object?.templateId || proof.proof?.template?.template_id || null,
-  state: sync.object?.properties?.state || enriched.state,
-  released_usd: sync.object?.properties?.released_usd || enriched.released_usd,
-  remaining_usd: sync.object?.properties?.remaining_usd || enriched.remaining_usd,
+  state: proofProperties.state || sync.object?.properties?.state || enriched.state,
+  released_usd: proofProperties.released_usd ?? sync.object?.properties?.released_usd ?? enriched.released_usd,
+  remaining_usd: proofProperties.remaining_usd ?? sync.object?.properties?.remaining_usd ?? enriched.remaining_usd,
+  current_milestone: proofProperties.current_milestone || sync.object?.properties?.current_milestone || enriched.current_milestone,
   verificationLevel: proof.verification?.verificationLevel || null,
   proofBundle: proof.proof?.bundle_hash || null,
   stateHash: proofObject.state_hash || null,
