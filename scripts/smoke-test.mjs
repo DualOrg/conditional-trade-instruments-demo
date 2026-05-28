@@ -48,6 +48,8 @@ assert(homeHtml.includes("TradeFlow Control Desk"), "home page includes demo tit
 assert(homeHtml.includes("Synthetic shipment, live DUAL proof"), "home page discloses synthetic shipment and live proof boundary");
 assert(homeHtml.includes("CTI-SG-AU-001"), "home page uses canonical trade instrument id");
 assert(homeHtml.includes("Recompute Proof"), "home page includes proof recompute action");
+assert(homeHtml.includes("60-90 second reviewer walkthrough"), "home page includes reviewer walkthrough");
+assert(homeHtml.includes("tradeflow-walkthrough.webm"), "home page links walkthrough asset");
 
 const reviewerHome = await fetch(`${baseUrl}/?demo=operator-cargo&reviewer=1`);
 const reviewerHtml = await reviewerHome.text();

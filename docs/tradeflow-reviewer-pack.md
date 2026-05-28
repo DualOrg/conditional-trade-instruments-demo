@@ -26,6 +26,18 @@ Repository:
 https://github.com/DualOrg/conditional-trade-instruments-demo
 ```
 
+CI:
+
+```text
+https://github.com/DualOrg/conditional-trade-instruments-demo/actions/workflows/tradeflow-ci.yml
+```
+
+Walkthrough:
+
+```text
+https://conditional-trade-instruments.vercel.app/assets/tradeflow-walkthrough.webm
+```
+
 ## What To Verify
 
 - The public banner says the shipment/payment story is synthetic demo data while the DUAL object, template, hashes, bundle, and explorer links are real testnet anchors.
@@ -43,6 +55,8 @@ https://github.com/DualOrg/conditional-trade-instruments-demo
 - `Recompute Proof` opens a public verifier report for reviewer-side hash re-derivation.
 - `Preview breach` visibly produces a blocked decision and decision hash without writing to DUAL.
 - Public writes remain disabled.
+- The landing page embeds the short reviewer walkthrough asset.
+- The reviewer pack includes mobile viewport evidence for the 390 x 844 pass.
 
 ## Live Proof IDs
 
@@ -84,6 +98,30 @@ curl -s https://conditional-trade-instruments.vercel.app/api/proof/rederive
 ```
 
 The re-derive path uses `sha256(JSON.stringify(stableSort(value)))` to recompute the policy, instrument, evidence, event, settlement, and bundle hashes. DUAL `state_hash` and `integrity_hash` are DUAL-chain canonical readback values; verify those via the linked DUAL block explorer object page.
+
+## Mobile Evidence
+
+Artifact:
+
+```text
+assets/tradeflow-mobile-390x844.png
+```
+
+Viewport checked:
+
+```text
+390 x 844
+```
+
+Result:
+
+```text
+scrollWidth = 390
+clientWidth = 390
+overflowing elements = []
+```
+
+Reviewer expectation: the disclosure band and walkthrough preview are first-viewport visible; proof actions, DUAL proof rail, and controls remain reachable without horizontal overflow.
 
 ## MCP Checks
 

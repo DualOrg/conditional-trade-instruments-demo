@@ -1,5 +1,7 @@
 # TradeFlow Control Desk
 
+[![TradeFlow CI](https://github.com/DualOrg/conditional-trade-instruments-demo/actions/workflows/tradeflow-ci.yml/badge.svg?branch=main)](https://github.com/DualOrg/conditional-trade-instruments-demo/actions/workflows/tradeflow-ci.yml)
+
 Local-first deployable demo for the DUAL Conditional Trade Instruments concept.
 
 Production demo:
@@ -52,6 +54,18 @@ The app demonstrates:
 The prepared demo entry opens with Cargo loaded verified, USD 29,700 released, Customs cleared as the next gate, and the live DUAL proof rail visible. See `docs/tradeflow-demo-runbook.md`.
 
 The shipment itself is synthetic demo data. The DUAL object, template, readback hashes, verifier bundle, and block explorer links are real testnet anchors.
+
+Reviewer walkthrough:
+
+```text
+assets/tradeflow-walkthrough.webm
+```
+
+Mobile QA evidence:
+
+```text
+assets/tradeflow-mobile-390x844.png
+```
 
 Demo operator docs:
 
@@ -175,7 +189,10 @@ Core fields:
 ```text
 npm run check
 npm run smoke
+npm run proof:rederive -- http://127.0.0.1:4176
 ```
+
+GitHub Actions runs the same syntax check, local smoke test, and local proof re-derivation on every push and pull request to `main`.
 
 This is a local-first prototype. It does not write to live DUAL objects by default.
 
