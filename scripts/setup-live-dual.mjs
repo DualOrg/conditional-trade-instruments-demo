@@ -2,7 +2,9 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   defaultOrgId,
+  dualConfig,
   instrumentTemplateProperties,
+  networkMigrationPreflight,
   normalizeInstrumentProperties,
   seedInstrumentProperties,
   templateName
@@ -11,9 +13,16 @@ import {
 const envPath = process.env.DUAL_ENV_FILE || "/Users/ibuswell/Documents/DualVault/sandbox/ager-dual-pilot/.env";
 const outputPath = process.env.DUAL_SETUP_OUTPUT || "/private/tmp/conditional-trade-live-setup.json";
 const env = { ...parseEnvFile(envPath), ...process.env };
-const apiUrl = (env.DUAL_API_URL || "https://api-testnet.dual.network").replace(/\/+$/, "");
-const orgId = env.DUAL_ORG_ID || defaultOrgId;
-const apiKey = env.DUAL_API_KEY || "";
+const config = dualConfig(env);
+const networkPreflight = networkMigrationPreflight(config, env);
+if (!networkPreflight.write_allowed) {
+  const error = new Error(networkPreflight.note);
+  error.readiness = networkPreflight;
+  throw error;
+}
+const apiUrl = config.apiUrl.replace(/\/+$/, "");
+const orgId = config.orgId || defaultOrgId;
+const apiKey = config.apiKey || "";
 
 if (!apiKey) {
   throw new Error(`DUAL_API_KEY was not found in ${resolve(envPath)} or process env.`);

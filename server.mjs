@@ -30,8 +30,9 @@ await loadDotEnv();
 
 const port = Number(process.env.PORT || 4176);
 const host = process.env.HOST || "127.0.0.1";
-const dualL3ExplorerBaseUrl = normalizeExternalBaseUrl(process.env.DUAL_L3_EXPLORER_BASE_URL || "https://explorer-testnet.dual.network");
-const dualL2ExplorerBaseUrl = normalizeExternalBaseUrl(process.env.DUAL_L2_EXPLORER_BASE_URL || process.env.DUAL_BLOCKSCOUT_BASE_URL || "https://explorer-test-v2.dual.network");
+const dualNetworkConfig = dualConfig();
+const dualL3ExplorerBaseUrl = normalizeExternalBaseUrl(dualNetworkConfig.l3ExplorerBaseUrl);
+const dualL2ExplorerBaseUrl = normalizeExternalBaseUrl(dualNetworkConfig.l2ExplorerBaseUrl);
 const appVersion = "0.1.0";
 const mcpProtocolVersion = "2025-06-18";
 const mcpServerInfo = {
@@ -1532,12 +1533,14 @@ function templateSummary() {
 }
 
 function safetySummary() {
+  const status = readiness();
   return {
     ok: true,
     publicWrites: false,
     writeExecutionExposed: false,
     operatorGatedRestEndpoints: ["/api/instruments/sync", "/api/instruments/mint"],
     operatorGate: operatorGateSummary(),
+    networkMigration: status.network,
     publicMcpToolsExecuteWrites: false,
     redTeamScenarios: ["corridor_mismatch", "missing_evidence", "over_limit", "customs_missing"],
     adversarialTool: "tradeflow_dual_evaluate_adversarial_gate accepts arbitrary gate inputs and an expected-result assertion.",
@@ -1547,6 +1550,7 @@ function safetySummary() {
 
 function proofCaveats(status) {
   const caveats = [];
+  if (status.network?.ready === false) caveats.push("DUAL mainnet mode is blocked until explicit non-testnet API/console/explorer config and cutover confirmation are configured.");
   if (!status.readbackReady) caveats.push("DUAL readback is not configured; proof uses deterministic seed instrument properties.");
   if (!status.writable) caveats.push("Live DUAL event-bus writes are disabled; public MCP only reads, evaluates, and prepares payload previews.");
   if (status.missing?.length) caveats.push(`Missing live setup: ${status.missing.join(", ")}.`);
@@ -1555,6 +1559,12 @@ function proofCaveats(status) {
 
 function mcpWarnings(status) {
   const warnings = [];
+  if (status.network?.ready === false) {
+    warnings.push({
+      code: "dual_mainnet_network_config_blocked",
+      message: "Mainnet mode requires explicit non-testnet API/console/explorer config plus cutover confirmation before DUAL readback or writes are enabled."
+    });
+  }
   if (!status.readbackReady) {
     warnings.push({
       code: "dual_readback_not_configured",
