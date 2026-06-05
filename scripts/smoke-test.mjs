@@ -1,4 +1,5 @@
 const baseUrl = process.env.DEMO_BASE_URL || "http://127.0.0.1:4176";
+const expectedDualOrgId = process.env.EXPECTED_DUAL_ORG_ID || "69b935b4187e903f826bbe71";
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -62,7 +63,7 @@ const status = await request("/api/dual/status");
 assert(status.response.ok, "status endpoint returns 200");
 assert(status.body.publicWrites === false, "status endpoint reports no public writes");
 assert(!("apiKey" in status.body), "status endpoint does not expose API key");
-assert(status.body.orgId === "69b935b4187e903f826bbe71", "status endpoint defaults to IanTest org");
+assert(status.body.orgId === expectedDualOrgId, `status endpoint reports expected DUAL org ${expectedDualOrgId}`);
 
 const current = await request("/api/instruments/current");
 assert(current.response.ok, "current instrument endpoint degrades safely");
